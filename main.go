@@ -121,6 +121,27 @@ func NewClient(ctx context.Context, bkt, stateFile, username, password string) (
 			log.Errorln("NewClient goinsta login", err)
 			return c, err
 		}
+
+		log.Infoln("NewClient exporting goinsta to /tmp/goinsta.state")
+		err = c.insta.Export("/tmp/goinsta.state")
+		if err != nil {
+			log.Errorln("NewClient export goinsta to /tmp/goinsta.state", err)
+		}
+
+		log.Infoln("NewClient opening /tmp/goinsta.state")
+		f, err := os.Open("/tmp/goinsta.state")
+		if err != nil {
+			log.Errorln("NewClient opening /tmp/goinsta.state", err)
+		}
+		defer f.Close()
+
+		log.Infoln("NewClient writing goinsta state to Storage")
+		w := c.buck.Object(c.statefile).NewWriter(ctx)
+		defer w.Close()
+		_, err = io.Copy(w, f)
+		if err != nil {
+			log.Errorln("NewClient writing state to storage", err)
+		}
 	} else {
 		defer r.Close()
 		log.Infoln("NewClient restore from ", c.statefile, "in", bkt)
