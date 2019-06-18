@@ -112,6 +112,7 @@ func NewClient(ctx context.Context, bkt, stateFile, username, password string) (
 	log.Infoln("NewClient get", c.statefile, "from bucket", bkt)
 	r, err := c.buck.Object(c.statefile).NewReader(ctx)
 	if err != nil {
+		log.Errorln("Newclient get", bkt, "/", c.statefile, err)
 		log.Infoln("NewClient", c.statefile, "not found, creating new instance of", username)
 		c.insta = goinsta.New(username, password)
 		log.Infoln("NewClient goinsta login")
