@@ -23,7 +23,7 @@ func (c *Client) FollowDiff(ctx context.Context) {
 
 	log.Infoln("FollowDiff restoring oldFollowers")
 	br, err := c.buck.Object("followers.json").NewReader(ctx)
-	oldFollowers := make(Users)
+	oldFollowers := make(map[int64]goinsta.User)
 	err = json.NewDecoder(br).Decode(&oldFollowers)
 	if err != nil {
 		log.Errorln("FollowDiff restore oldFollowers")
@@ -32,7 +32,7 @@ func (c *Client) FollowDiff(ctx context.Context) {
 
 	log.Infoln("FollowDiff restoring oldFollowing")
 	br, err = c.buck.Object("followers.json").NewReader(ctx)
-	oldFollowing := make(Users)
+	oldFollowing := make(map[int64]goinsta.User)
 	err = json.NewDecoder(br).Decode(&oldFollowing)
 	if err != nil {
 		log.Errorln("FollowDiff restore oldFollowing")
