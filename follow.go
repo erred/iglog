@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,88 +11,56 @@ import (
 
 func (c *Client) FollowDiff(ctx context.Context) {
 	var err error
+	var followEvents FollowEvents
+	oldFollowers, oldFollowing := map[int64]goinsta.User{}, map[int64]goinsta.User{}
 
 	log.Infoln("FollowDiff restoring oldFollowers")
-	oldFollowers := make(map[int64]goinsta.User)
-	br, err := c.buck.Object("followers.json").NewReader(ctx)
-	if err != nil {
-		log.Errorln("FollowDiff get followers reader", err)
-	} else {
-		err = json.NewDecoder(br).Decode(&oldFollowers)
-		if err != nil {
-			log.Errorln("FollowDiff restore oldFollowers", err)
-		}
-		br.Close()
+	if err = c.Decode(ctx, "followers.json", &oldFollowers); err != nil {
+		log.Errorln("FollowDiff restore oldFollowers", err)
 	}
 
 	log.Infoln("FollowDiff restoring oldFollowing")
-	oldFollowing := make(map[int64]goinsta.User)
-	br, err = c.buck.Object("following.json").NewReader(ctx)
-	if err != nil {
-		log.Errorln("FollowDiff get following reader", err)
-	} else {
-		err = json.NewDecoder(br).Decode(&oldFollowing)
-		if err != nil {
-			log.Errorln("FollowDiff restore oldFollowing", err)
-		}
-		br.Close()
+	if err = c.Decode(ctx, "following.json", &oldFollowing); err != nil {
+		log.Errorln("FollowDiff restore oldFollowing", err)
 	}
 
 	log.Infoln("FollowDiff restoring followEvents")
-	var followEvents FollowEvents
-	br, err = c.buck.Object("followEvents.json").NewReader(ctx)
-	if err != nil {
-		log.Errorln("FollowDiff get followEvents reader", err)
-	} else {
-		err = json.NewDecoder(br).Decode(&followEvents)
-		if err != nil {
-			log.Errorln("FollowDiff restore followEvents")
-		}
-		br.Close()
+	if err = c.Decode(ctx, "followEvents.json", &followEvents); err != nil {
+		log.Errorln("FollowDiff restore followEvents", err)
 	}
 
 	log.Infoln("FollowDiff start diffFollows")
-	fd, err := diffFollows(c.insta.Account, oldFollowers, oldFollowing)
-	if err != nil {
+	if c.followDiff, err = diffFollows(c.insta.Account, oldFollowers, oldFollowing); err != nil {
 		log.Errorln("FollowDiff diffFollows", err)
 	}
 
-	fmt.Println("old followers:", len(oldFollowers), "old following:", len(oldFollowing))
-	fmt.Println("new followers:", len(fd.followers), "new following:", len(fd.following))
-	fmt.Println("gained followers:", len(fd.GainedFollowers), "lost followers:", len(fd.LostFollowers))
-	fmt.Println("gained following:", len(fd.GainedFollowing), "lost following:", len(fd.LostFollowing))
+	oe, oi := len(oldFollowers), len(oldFollowing)
+	ne, ni := len(c.followDiff.followers), len(c.followDiff.following)
+	ge, gi := len(c.followDiff.GainedFollowers), len(c.followDiff.GainedFollowing)
+	le, li := len(c.followDiff.LostFollowers), len(c.followDiff.LostFollowing)
+	fmt.Println("old followers:", oe, "old following:", oi)
+	fmt.Println("new followers:", ne, "new following:", ni)
+	fmt.Println("gained followers:", ge, "lost followers:", le)
+	fmt.Println("gained following:", gi, "lost following:", li)
 
-	followEvents = append(followEvents, FollowEvent{time.Now(), fd})
+	if ge+gi+le+li != 0 {
+		log.Infoln("FollowDiff saving followEvents")
+		followEvents = append(followEvents, FollowEvent{time.Now(), c.followDiff})
+		if err = c.Encode(ctx, "followEvents.json", followEvents); err != nil {
+			log.Errorln("FollowDiff save followEvents", err)
+		}
+	}
 
 	log.Infoln("FollowDiff saving followers")
-	bw := c.buck.Object("followers.json").NewWriter(ctx)
-	e := json.NewEncoder(bw)
-	e.SetIndent("", "\t")
-	err = e.Encode(fd.followers)
-	if err != nil {
+	if err = c.Encode(ctx, "followers.json", c.followDiff.followers); err != nil {
 		log.Errorln("FollowDiff save followers", err)
 	}
-	bw.Close()
 
 	log.Infoln("FollowDiff saving following")
-	bw = c.buck.Object("following.json").NewWriter(ctx)
-	e = json.NewEncoder(bw)
-	e.SetIndent("", "\t")
-	err = e.Encode(fd.following)
-	if err != nil {
+	if err = c.Encode(ctx, "following.json", c.followDiff.following); err != nil {
 		log.Errorln("FollowDiff save following", err)
 	}
-	bw.Close()
 
-	log.Infoln("FollowDiff saving followEvents")
-	bw = c.buck.Object("followEvents.json").NewWriter(ctx)
-	e = json.NewEncoder(bw)
-	e.SetIndent("", "\t")
-	err = e.Encode(followEvents)
-	if err != nil {
-		log.Errorln("FollowDiff save followEvents", err)
-	}
-	bw.Close()
 }
 
 type FollowEvents []FollowEvent

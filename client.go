@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -19,6 +20,8 @@ type Client struct {
 
 	alive, ready bool
 	statefile    string
+
+	followDiff *FollowDiff
 }
 
 func NewClient(ctx context.Context, bkt, stateFile, username, password string) (*Client, error) {
@@ -137,4 +140,30 @@ func (c *Client) Shutdown(ctx context.Context) {
 	if err != nil {
 		log.Errorln("Shutdown http server", err)
 	}
+}
+
+func (c *Client) Decode(ctx context.Context, obj string, d interface{}) error {
+	log.Infoln("Decoding", obj)
+	r, err := c.buck.Object(obj).NewReader(ctx)
+	if err != nil {
+		log.Errorln("Decode get reader for", obj, err)
+		return err
+	}
+	defer r.Close()
+	err = json.NewDecoder(r).Decode(d)
+	if err != nil {
+		log.Errorln("Decode json for", obj, err)
+	}
+	return err
+}
+
+func (c *Client) Encode(ctx context.Context, obj string, d interface{}) error {
+	log.Infoln("Encoding", obj)
+	w := c.buck.Object(obj).NewWriter(ctx)
+	defer w.Close()
+	err := json.NewEncoder(w).Encode(d)
+	if err != nil {
+		log.Errorln("Encode json for", obj, err)
+	}
+	return err
 }
