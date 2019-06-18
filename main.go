@@ -160,16 +160,16 @@ func (c *Client) Shutdown(ctx context.Context) {
 	var err error
 	c.ready = false
 
-	log.Infoln("Shutdown exporting goinsta to /tmp/goinsta.state")
-	err = c.insta.Export("/tmp/goinsta.state")
+	log.Infoln("Shutdown exporting goinsta to goinsta.state")
+	err = c.insta.Export("goinsta.state")
 	if err != nil {
-		log.Errorln("Shutdown export goinsta to /tmp/goinsta.state", err)
+		log.Errorln("Shutdown export goinsta to goinsta.state", err)
 	}
 
-	log.Infoln("Shutdown opening /tmp/goinsta.state")
-	f, err := os.Open("/tmp/goinsta.state")
+	log.Infoln("Shutdown opening goinsta.state")
+	f, err := os.Open("goinsta.state")
 	if err != nil {
-		log.Errorln("Shutdown opening /tmp/goinsta.state", err)
+		log.Errorln("Shutdown opening goinsta.state", err)
 	}
 	defer f.Close()
 
