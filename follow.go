@@ -10,14 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (c *Client) TickFollowDiff(ctx context.Context, d time.Duration) {
-	c.FollowDiff(ctx)
-	t := time.NewTicker(d)
-	for range t.C {
-		c.FollowDiff(ctx)
-	}
-}
-
 func (c *Client) FollowDiff(ctx context.Context) {
 	var err error
 
