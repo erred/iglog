@@ -9,7 +9,10 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/ahmdrz/goinsta"
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
+	"github.com/seankhliao/iglog/iglog"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 type Client struct {
@@ -21,7 +24,13 @@ type Client struct {
 	alive, ready bool
 	statefile    string
 
-	followDiff *FollowDiff
+	followDiff   *FollowDiff
+	followEvents FollowEvents
+}
+
+func allowOrigin(o string) bool {
+	_, ok := Origins[o]
+	return ok
 }
 
 func NewClient(ctx context.Context, bkt, stateFile, username, password string) (*Client, error) {
@@ -33,6 +42,13 @@ func NewClient(ctx context.Context, bkt, stateFile, username, password string) (
 		alive:     true,
 		statefile: stateFile,
 	}
+
+	gsvr := grpc.NewServer()
+	iglog.RegisterFollowatchServer(gsvr, c)
+	wsvr := grpcweb.WrapServer(gsvr,
+		grpcweb.WithOriginFunc(allowOrigin),
+		grpcweb.WithAllowedRequestHeaders(Headers),
+	)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
@@ -48,6 +64,7 @@ func NewClient(ctx context.Context, bkt, stateFile, username, password string) (
 		}
 		w.WriteHeader(status)
 	})
+	http.Handle("/", wsvr)
 
 	log.Infoln("NewClient setup Storage client")
 	c.store, err = storage.NewClient(ctx)

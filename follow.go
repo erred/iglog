@@ -11,7 +11,6 @@ import (
 
 func (c *Client) FollowDiff(ctx context.Context) {
 	var err error
-	var followEvents FollowEvents
 	oldFollowers, oldFollowing := map[int64]goinsta.User{}, map[int64]goinsta.User{}
 
 	log.Infoln("FollowDiff restoring oldFollowers")
@@ -24,9 +23,11 @@ func (c *Client) FollowDiff(ctx context.Context) {
 		log.Errorln("FollowDiff restore oldFollowing", err)
 	}
 
-	log.Infoln("FollowDiff restoring followEvents")
-	if err = c.Decode(ctx, "followEvents.json", &followEvents); err != nil {
-		log.Errorln("FollowDiff restore followEvents", err)
+	if c.followEvents == nil {
+		log.Infoln("FollowDiff restoring followEvents")
+		if err = c.Decode(ctx, "followEvents.json", &c.followEvents); err != nil {
+			log.Errorln("FollowDiff restore followEvents", err)
+		}
 	}
 
 	log.Infoln("FollowDiff start diffFollows")
@@ -46,8 +47,8 @@ func (c *Client) FollowDiff(ctx context.Context) {
 
 	if ge+gi+le+li != 0 {
 		log.Infoln("FollowDiff saving followEvents")
-		followEvents = append(followEvents, FollowEvent{time.Now(), c.followDiff})
-		if err = c.Encode(ctx, "followEvents.json", followEvents); err != nil {
+		c.followEvents = append(c.followEvents, FollowEvent{time.Now(), c.followDiff})
+		if err = c.Encode(ctx, "followEvents.json", c.followEvents); err != nil {
 			log.Errorln("FollowDiff save followEvents", err)
 		}
 	}

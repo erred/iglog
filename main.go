@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 var (
 	Version = "set with -ldflags \"-X main.Verions=$VERSION\""
 
-	Port = os.Getenv("PORT")
+	Headers = strings.Split(os.Getenv("HEADERS"), ",")
+	Origins = make(map[string]struct{})
+	Port    = os.Getenv("PORT")
 
 	StateFile = "state.goinsta"
 	Username  = os.Getenv("IG_USER")
@@ -38,6 +41,14 @@ func init() {
 		log.SetFormatter(&log.JSONFormatter{})
 	default:
 		log.SetFormatter(&log.TextFormatter{})
+	}
+
+	for i, h := range Headers {
+		Headers[i] = strings.TrimSpace(h)
+	}
+
+	for _, o := range strings.Split(os.Getenv("ORIGINS"), ",") {
+		Origins[strings.TrimSpace(o)] = struct{}{}
 	}
 }
 
