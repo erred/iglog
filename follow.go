@@ -32,6 +32,7 @@ func (c *Client) FollowDiff(ctx context.Context) {
 	log.Infoln("FollowDiff start diffFollows")
 	if c.followDiff, err = diffFollows(c.insta.Account, oldFollowers, oldFollowing); err != nil {
 		log.Errorln("FollowDiff diffFollows", err)
+		return
 	}
 
 	oe, oi := len(oldFollowers), len(oldFollowing)
@@ -60,7 +61,6 @@ func (c *Client) FollowDiff(ctx context.Context) {
 	if err = c.Encode(ctx, "following.json", c.followDiff.following); err != nil {
 		log.Errorln("FollowDiff save following", err)
 	}
-
 }
 
 type FollowEvents []FollowEvent
