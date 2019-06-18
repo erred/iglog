@@ -22,31 +22,43 @@ func (c *Client) FollowDiff(ctx context.Context) {
 	var err error
 
 	log.Infoln("FollowDiff restoring oldFollowers")
-	br, err := c.buck.Object("followers.json").NewReader(ctx)
 	oldFollowers := make(map[int64]goinsta.User)
-	err = json.NewDecoder(br).Decode(&oldFollowers)
+	br, err := c.buck.Object("followers.json").NewReader(ctx)
 	if err != nil {
-		log.Errorln("FollowDiff restore oldFollowers")
+		log.Errorln("FollowDiff get followers reader", err)
+	} else {
+		err = json.NewDecoder(br).Decode(&oldFollowers)
+		if err != nil {
+			log.Errorln("FollowDiff restore oldFollowers", err)
+		}
+		br.Close()
 	}
-	br.Close()
 
 	log.Infoln("FollowDiff restoring oldFollowing")
-	br, err = c.buck.Object("followers.json").NewReader(ctx)
 	oldFollowing := make(map[int64]goinsta.User)
-	err = json.NewDecoder(br).Decode(&oldFollowing)
+	br, err = c.buck.Object("followers.json").NewReader(ctx)
 	if err != nil {
-		log.Errorln("FollowDiff restore oldFollowing")
+		log.Errorln("FollowDiff get following reader", err)
+	} else {
+		err = json.NewDecoder(br).Decode(&oldFollowing)
+		if err != nil {
+			log.Errorln("FollowDiff restore oldFollowing", err)
+		}
+		br.Close()
 	}
-	br.Close()
 
 	log.Infoln("FollowDiff restoring followEvents")
-	br, err = c.buck.Object("followEvents.json").NewReader(ctx)
 	var followEvents FollowEvents
-	err = json.NewDecoder(br).Decode(&followEvents)
+	br, err = c.buck.Object("followEvents.json").NewReader(ctx)
 	if err != nil {
-		log.Errorln("FollowDiff restore followEvents")
+		log.Errorln("FollowDiff get followEvents reader", err)
+	} else {
+		err = json.NewDecoder(br).Decode(&followEvents)
+		if err != nil {
+			log.Errorln("FollowDiff restore followEvents")
+		}
+		br.Close()
 	}
-	br.Close()
 
 	log.Infoln("FollowDiff start diffFollows")
 	fd, err := diffFollows(c.insta.Account, oldFollowers, oldFollowing)
