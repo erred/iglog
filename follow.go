@@ -36,7 +36,7 @@ func (c *Client) FollowDiff(ctx context.Context) {
 
 	log.Infoln("FollowDiff restoring oldFollowing")
 	oldFollowing := make(map[int64]goinsta.User)
-	br, err = c.buck.Object("followers.json").NewReader(ctx)
+	br, err = c.buck.Object("following.json").NewReader(ctx)
 	if err != nil {
 		log.Errorln("FollowDiff get following reader", err)
 	} else {
