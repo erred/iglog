@@ -12,6 +12,10 @@ import (
 func (c *Client) EventLog(ctx context.Context, r *iglog.Request) (*iglog.Events, error) {
 	log.Infoln("EventLog started")
 	evs := &iglog.Events{}
+	if c.followEvents == nil {
+		log.Errorln("EventLog not initialized")
+		return evs, nil
+	}
 	for _, e := range c.followEvents {
 		for _, u := range e.GainedFollowers {
 			evs.Events = append(evs.Events, &iglog.Event{
@@ -48,6 +52,10 @@ func (c *Client) EventLog(ctx context.Context, r *iglog.Request) (*iglog.Events,
 func (c *Client) Followers(ctx context.Context, r *iglog.Request) (*iglog.Users, error) {
 	log.Infoln("Followers started")
 	us := &iglog.Users{}
+	if c.followDiff == nil || c.followDiff.followers == nil {
+		log.Errorln("Followers not initialized")
+		return us, nil
+	}
 	us.Users = make([]*iglog.User, len(c.followDiff.followers))
 	for i, u := range c.followDiff.followers {
 		us.Users[i] = user2proto(u)
@@ -59,6 +67,10 @@ func (c *Client) Followers(ctx context.Context, r *iglog.Request) (*iglog.Users,
 func (c *Client) Following(ctx context.Context, r *iglog.Request) (*iglog.Users, error) {
 	log.Infoln("Following started")
 	us := &iglog.Users{}
+	if c.followDiff == nil || c.followDiff.following == nil {
+		log.Errorln("Following not initialized")
+		return us, nil
+	}
 	us.Users = make([]*iglog.User, len(c.followDiff.following))
 	for i, u := range c.followDiff.following {
 		us.Users[i] = user2proto(u)
