@@ -31,7 +31,7 @@ type Client struct {
 	statefile    string
 
 	// followatch data
-	fDiffOnce *sync.Once
+	fDiffOnce sync.Once
 	fDiff     *FollowDiff
 	pDiff     *ProtoDiff
 	// cached grpc
