@@ -176,13 +176,13 @@ func (c *Client) authInterceptor(ctx context.Context, r interface{}, info *grpc.
 
 	log.Infoln("authInterceptor get authHeader")
 	authHeader, ok := md["authorization"]
-	if !ok {
-		log.Errorln("authInterceptor no authHeader")
+	if !ok || len(authHeader) == 0 {
+		log.Errorln("authInterceptor no authHeader", authHeader)
 		return nil, errors.New("authInterceptor: authorization header not found")
 	}
 
 	log.Infoln("authInterceptor VerifyIDToken")
-	tok, err := c.auth.VerifyIDToken(context.Background(), authHeader[0])
+	tok, err := c.auth.VerifyIDToken(ctx, authHeader[0])
 	if err != nil {
 		log.Errorln("authInterceptor VerifyIDToken", err)
 		return nil, err
