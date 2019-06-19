@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/ahmdrz/goinsta"
@@ -59,6 +60,9 @@ func (c *Client) Followers(ctx context.Context, r *iglog.Request) (*iglog.Users,
 	for _, u := range c.followDiff.followers {
 		us.Users = append(us.Users, user2proto(u))
 	}
+	sort.Slice(us.Users, func(i, j int) bool {
+		return us.Users[i].Username < us.Users[j].Username
+	})
 	log.Infoln("Followers done")
 	return us, nil
 }
@@ -73,6 +77,9 @@ func (c *Client) Following(ctx context.Context, r *iglog.Request) (*iglog.Users,
 	for _, u := range c.followDiff.following {
 		us.Users = append(us.Users, user2proto(u))
 	}
+	sort.Slice(us.Users, func(i, j int) bool {
+		return us.Users[i].Username < us.Users[j].Username
+	})
 	log.Infoln("Following done")
 	return us, nil
 }
