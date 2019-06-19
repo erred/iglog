@@ -39,11 +39,7 @@ func (c *Client) FollowDiff(ctx context.Context) {
 	log.Infoln("FollowDiff starting")
 	var err error
 
-	log.Debugln("FollowDiff get old FollowDiff")
-	if c.fDiff == nil {
-		log.Debugln("FollowDiff get old FollowDiff from storage")
-		c.retrieveFollowDiff(ctx)
-	}
+	c.fDiffOnce.Do(c.retrieveFollowDiff)
 
 	log.Debugln("FollowDiff get new FollowDiff")
 	err = c.newFollowDiff(ctx)
@@ -58,7 +54,8 @@ func (c *Client) FollowDiff(ctx context.Context) {
 }
 
 // RetrieveFollowDiff creates a followdiff by getting it from storage
-func (c *Client) retrieveFollowDiff(ctx context.Context) {
+func (c *Client) retrieveFollowDiff() {
+	ctx := context.Background()
 	c.fDiff = &FollowDiff{}
 
 	log.Debugln("NewFollowDiff restoring followers")

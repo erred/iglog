@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 
 	"cloud.google.com/go/storage"
 	firebase "firebase.google.com/go"
@@ -30,8 +31,9 @@ type Client struct {
 	statefile    string
 
 	// followatch data
-	fDiff *FollowDiff
-	pDiff *ProtoDiff
+	fDiffOnce *sync.Once
+	fDiff     *FollowDiff
+	pDiff     *ProtoDiff
 	// cached grpc
 	gEvents *iglog.Events
 	gWers   *iglog.Users

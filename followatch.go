@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/ahmdrz/goinsta"
@@ -33,9 +34,11 @@ func (c *Client) Following(ctx context.Context, r *iglog.Request) (*iglog.Users,
 func (c *Client) followDiffProto() {
 	log.Debugln("FollowDiffProto events")
 	c.pDiff = &ProtoDiff{}
-	c.pDiff.events = &iglog.Events{}
-	for _, e := range c.fDiff.events {
-		c.pDiff.events.Events = append(c.pDiff.events.Events, event2proto(e))
+	c.pDiff.events = &iglog.Events{
+		Events: make([]*iglog.Event, len(c.fDiff.events)),
+	}
+	for i, e := range c.fDiff.events {
+		c.pDiff.events.Events[len(c.fDiff.events)-1-i] = event2proto(e)
 	}
 
 	log.Debugln("FollowDiffProto followers")
@@ -43,12 +46,18 @@ func (c *Client) followDiffProto() {
 	for _, u := range c.fDiff.followers {
 		c.pDiff.followers.Users = append(c.pDiff.followers.Users, user2proto(u))
 	}
+	sort.Slice(c.pDiff.followers.Users, func(i, j int) bool {
+		return c.pDiff.followers.Users[i].Username < c.pDiff.followers.Users[i].Username
+	})
 
 	log.Debugln("FollowDiffProto following")
 	c.pDiff.following = &iglog.Users{}
 	for _, u := range c.fDiff.following {
 		c.pDiff.following.Users = append(c.pDiff.following.Users, user2proto(u))
 	}
+	sort.Slice(c.pDiff.following.Users, func(i, j int) bool {
+		return c.pDiff.following.Users[i].Username < c.pDiff.following.Users[i].Username
+	})
 
 }
 
