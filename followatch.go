@@ -56,9 +56,8 @@ func (c *Client) Followers(ctx context.Context, r *iglog.Request) (*iglog.Users,
 		log.Errorln("Followers not initialized")
 		return us, nil
 	}
-	us.Users = make([]*iglog.User, len(c.followDiff.followers))
-	for i, u := range c.followDiff.followers {
-		us.Users[i] = user2proto(u)
+	for _, u := range c.followDiff.followers {
+		us.Users = append(us.Users, user2proto(u))
 	}
 	log.Infoln("Followers done")
 	return us, nil
@@ -71,9 +70,8 @@ func (c *Client) Following(ctx context.Context, r *iglog.Request) (*iglog.Users,
 		log.Errorln("Following not initialized")
 		return us, nil
 	}
-	us.Users = make([]*iglog.User, len(c.followDiff.following))
-	for i, u := range c.followDiff.following {
-		us.Users[i] = user2proto(u)
+	for _, u := range c.followDiff.following {
+		us.Users = append(us.Users, user2proto(u))
 	}
 	log.Infoln("Following done")
 	return us, nil
