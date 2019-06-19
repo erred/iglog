@@ -40,6 +40,7 @@ func (c *Client) followDiffProto() {
 	for i, e := range c.fDiff.events {
 		c.pDiff.events.Events[len(c.fDiff.events)-1-i] = event2proto(e)
 	}
+	log.Debugln("FollowDiffProto events", len(c.pDiff.events.Events))
 
 	log.Debugln("FollowDiffProto followers")
 	c.pDiff.followers = &iglog.Users{}
@@ -47,8 +48,9 @@ func (c *Client) followDiffProto() {
 		c.pDiff.followers.Users = append(c.pDiff.followers.Users, user2proto(u))
 	}
 	sort.Slice(c.pDiff.followers.Users, func(i, j int) bool {
-		return c.pDiff.followers.Users[i].Username < c.pDiff.followers.Users[i].Username
+		return c.pDiff.followers.Users[i].Username < c.pDiff.followers.Users[j].Username
 	})
+	log.Debugln("FollowDiffProto followers", len(c.pDiff.followers.Users))
 
 	log.Debugln("FollowDiffProto following")
 	c.pDiff.following = &iglog.Users{}
@@ -56,9 +58,9 @@ func (c *Client) followDiffProto() {
 		c.pDiff.following.Users = append(c.pDiff.following.Users, user2proto(u))
 	}
 	sort.Slice(c.pDiff.following.Users, func(i, j int) bool {
-		return c.pDiff.following.Users[i].Username < c.pDiff.following.Users[i].Username
+		return c.pDiff.following.Users[i].Username < c.pDiff.following.Users[j].Username
 	})
-
+	log.Debugln("FollowDiffProto following", len(c.pDiff.following.Users))
 }
 
 func event2proto(e FollowEvent) *iglog.Event {
