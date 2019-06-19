@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
 
 	"cloud.google.com/go/storage"
+	"firebase.google.com/go/auth"
 	"github.com/ahmdrz/goinsta"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/seankhliao/iglog/iglog"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type Client struct {
@@ -20,6 +23,7 @@ type Client struct {
 	buck  *storage.BucketHandle
 	insta *goinsta.Instagram
 	svr   *http.Server
+	auth  *auth.Client
 
 	alive, ready bool
 	statefile    string
@@ -43,7 +47,7 @@ func NewClient(ctx context.Context, bkt, stateFile, username, password string) (
 		statefile: stateFile,
 	}
 
-	gsvr := grpc.NewServer()
+	gsvr := grpc.NewServer(grpc.UnaryInterceptor(c.authInterceptor))
 	iglog.RegisterFollowatchServer(gsvr, c)
 	wsvr := grpcweb.WrapServer(gsvr,
 		grpcweb.WithOriginFunc(allowOrigin),
@@ -157,6 +161,46 @@ func (c *Client) Shutdown(ctx context.Context) {
 	if err != nil {
 		log.Errorln("Shutdown http server", err)
 	}
+}
+
+func (c *Client) authInterceptor(ctx context.Context, r interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	log.Infoln("authInterceptor authorizing")
+
+	log.Infoln("authInterceptor get metadata")
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		log.Errorln("authInterceptor no metadata")
+		return nil, errors.New("authInterceptor: no metadata found")
+	}
+
+	log.Infoln("authInterceptor get authHeader")
+	authHeader, ok := md["authorization"]
+	if !ok {
+		log.Errorln("authInterceptor no authHeader")
+		return nil, errors.New("authInterceptor: authorization header not found")
+	}
+
+	log.Infoln("authInterceptor VerifyIDToken")
+	tok, err := c.auth.VerifyIDToken(context.Background(), authHeader[0])
+	if err != nil {
+		log.Errorln("authInterceptor VerifyIDToken", err)
+		return nil, err
+	}
+
+	log.Infoln("authInterceptor GetUser")
+	user, err := c.auth.GetUser(ctx, tok.UID)
+	if err != nil {
+		log.Errorln("authInterceptor GetUser", err)
+		return nil, err
+	}
+
+	log.Infoln("authInterceptor check user")
+	if _, ok := Emails[user.Email]; !ok {
+		log.Errorln("User", user.Email, "not is authorized set")
+	}
+
+	log.Infoln("authInterceptor authorized")
+	return handler(ctx, r)
 }
 
 func (c *Client) Decode(ctx context.Context, obj string, d interface{}) error {

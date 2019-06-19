@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.40.0
+	firebase.google.com/go v3.8.1+incompatible
 	github.com/ahmdrz/goinsta v0.0.0-20190613102456-6c1a138a43da
 	github.com/golang/protobuf v1.3.1
 	github.com/gorilla/websocket v1.4.0 // indirect

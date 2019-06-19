@@ -22,6 +22,7 @@ var (
 	Username  = os.Getenv("IG_USER")
 	Password  = os.Getenv("IG_PASS")
 	Bucket    = os.Getenv("BUCKET")
+	Emails    = make(map[string]struct{})
 )
 
 func init() {
@@ -49,6 +50,13 @@ func init() {
 
 	for _, o := range strings.Split(os.Getenv("ORIGINS"), ",") {
 		Origins[strings.TrimSpace(o)] = struct{}{}
+	}
+	if Port == "" {
+		Port = ":8080"
+	}
+
+	for _, e := range strings.Split(os.Getenv("EMAILS"), ",") {
+		Emails[strings.TrimSpace(e)] = struct{}{}
 	}
 }
 
