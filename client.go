@@ -34,6 +34,7 @@ type Client struct {
 
 func allowOrigin(o string) bool {
 	_, ok := Origins[o]
+	log.Infoln("allowOrigin", o, ok)
 	return ok
 }
 
