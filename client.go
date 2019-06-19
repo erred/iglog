@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"cloud.google.com/go/storage"
+	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
 	"github.com/ahmdrz/goinsta"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -46,6 +47,18 @@ func NewClient(ctx context.Context, bkt, stateFile, username, password string) (
 		},
 		alive:     true,
 		statefile: stateFile,
+	}
+
+	log.Infoln("NewClient firebase NewApp")
+	app, err := firebase.NewApp(ctx, nil)
+	if err != nil {
+		log.Fatalln("NewClient firebase NewApp", err)
+	}
+
+	log.Infoln("NewClient firebase auth")
+	c.auth, err = app.Auth(ctx)
+	if err != nil {
+		log.Fatalln("NewClient firebase auth", err)
 	}
 
 	gsvr := grpc.NewServer(grpc.UnaryInterceptor(c.authInterceptor))
