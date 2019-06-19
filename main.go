@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -62,26 +63,36 @@ func init() {
 
 func main() {
 	ctx := context.Background()
+	log.Infoln("main NewClient")
 	c, err := NewClient(ctx, Bucket, StateFile, Username, Password)
 	if err != nil {
 		log.Fatalln("main:", err)
 	}
 	defer c.Shutdown(ctx)
 
+	var wg sync.WaitGroup
+
 	// start work
-	go tick(ctx, time.Hour, c.FollowDiff)
+	wg.Add(1)
+	go tick(ctx, time.Hour, c.FollowDiff, &wg)
+	go func() {
+		wg.Wait()
+		c.ready = true
+	}()
 
 	// spin off server
 	go c.svr.ListenAndServe()
 
 	// block on waiting for signal
+	log.Infoln("main waiting")
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGKILL)
 	<-sigs
 }
 
-func tick(ctx context.Context, d time.Duration, f func(context.Context)) {
+func tick(ctx context.Context, d time.Duration, f func(context.Context), wg *sync.WaitGroup) {
 	f(ctx)
+	wg.Done()
 	for range time.NewTicker(d).C {
 		f(ctx)
 	}

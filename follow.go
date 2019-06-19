@@ -9,70 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (c *Client) FollowDiff(ctx context.Context) {
-	var err error
-	oldFollowers, oldFollowing := map[int64]goinsta.User{}, map[int64]goinsta.User{}
-
-	log.Infoln("FollowDiff restoring oldFollowers")
-	if err = c.Decode(ctx, "followers.json", &oldFollowers); err != nil {
-		log.Errorln("FollowDiff restore oldFollowers", err)
-	}
-
-	log.Infoln("FollowDiff restoring oldFollowing")
-	if err = c.Decode(ctx, "following.json", &oldFollowing); err != nil {
-		log.Errorln("FollowDiff restore oldFollowing", err)
-	}
-
-	if c.followEvents == nil {
-		log.Infoln("FollowDiff restoring followEvents")
-		if err = c.Decode(ctx, "followEvents.json", &c.followEvents); err != nil {
-			log.Errorln("FollowDiff restore followEvents", err)
-		}
-	}
-
-	log.Infoln("FollowDiff start diffFollows")
-	if c.followDiff, err = diffFollows(c.insta.Account, oldFollowers, oldFollowing); err != nil {
-		log.Errorln("FollowDiff diffFollows", err)
-		return
-	}
-
-	oe, oi := len(oldFollowers), len(oldFollowing)
-	ne, ni := len(c.followDiff.followers), len(c.followDiff.following)
-	ge, gi := len(c.followDiff.GainedFollowers), len(c.followDiff.GainedFollowing)
-	le, li := len(c.followDiff.LostFollowers), len(c.followDiff.LostFollowing)
-	fmt.Println("old followers:", oe, "old following:", oi)
-	fmt.Println("new followers:", ne, "new following:", ni)
-	fmt.Println("gained followers:", ge, "lost followers:", le)
-	fmt.Println("gained following:", gi, "lost following:", li)
-
-	if ge+gi+le+li != 0 {
-		log.Infoln("FollowDiff saving followEvents")
-		c.followEvents = append(c.followEvents, FollowEvent{time.Now(), c.followDiff})
-		if err = c.Encode(ctx, "followEvents.json", c.followEvents); err != nil {
-			log.Errorln("FollowDiff save followEvents", err)
-		}
-	}
-
-	log.Infoln("FollowDiff saving followers")
-	if err = c.Encode(ctx, "followers.json", c.followDiff.followers); err != nil {
-		log.Errorln("FollowDiff save followers", err)
-	}
-
-	log.Infoln("FollowDiff saving following")
-	if err = c.Encode(ctx, "following.json", c.followDiff.following); err != nil {
-		log.Errorln("FollowDiff save following", err)
-	}
-}
-
-type FollowEvents []FollowEvent
-type FollowEvent struct {
-	TimeStamp time.Time
-	*FollowDiff
-}
-
-type Users map[int64]goinsta.User
-
 type FollowDiff struct {
+	events               []FollowEvent
 	followers, following Users
 	GainedFollowers      Users
 	LostFollowers        Users
@@ -80,20 +18,138 @@ type FollowDiff struct {
 	LostFollowing        Users
 }
 
-func diffFollows(a *goinsta.Account, oldFollowers, oldFollowing Users) (*FollowDiff, error) {
+type FollowEvent struct {
+	TimeStamp time.Time
+	Type      FollowEventType
+	User      goinsta.User
+}
+
+type Users map[int64]goinsta.User
+
+type FollowEventType int
+
+const (
+	FEFollowerGained FollowEventType = iota
+	FEFollowerLost
+	FEFollowingGained
+	FEFollowingLost
+)
+
+func (c *Client) FollowDiff(ctx context.Context) {
+	log.Infoln("FollowDiff starting")
 	var err error
-	fd := &FollowDiff{}
-	fd.followers, err = getUsers(a.Followers())
-	if err != nil {
-		return nil, fmt.Errorf("diffFollows get followers: %v", err)
+
+	log.Debugln("FollowDiff get old FollowDiff")
+	if c.fDiff == nil {
+		log.Debugln("FollowDiff get old FollowDiff from storage")
+		c.retrieveFollowDiff(ctx)
 	}
-	fd.following, err = getUsers(a.Following())
+
+	log.Debugln("FollowDiff get new FollowDiff")
+	err = c.newFollowDiff(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("diffFollows get following: %v", err)
+		log.Errorln("FollowDiff get new FollowDiff", err)
+		return
 	}
-	fd.GainedFollowers, fd.LostFollowers = diffUsers(fd.followers, oldFollowers)
-	fd.GainedFollowing, fd.LostFollowing = diffUsers(fd.following, oldFollowing)
-	return fd, nil
+
+	c.fDiff.print()
+	c.followDiffProto()
+	c.saveFollowDiff(ctx)
+}
+
+// RetrieveFollowDiff creates a followdiff by getting it from storage
+func (c *Client) retrieveFollowDiff(ctx context.Context) {
+	c.fDiff = &FollowDiff{}
+
+	log.Debugln("NewFollowDiff restoring followers")
+	c.fDiff.followers = make(map[int64]goinsta.User)
+	if err := c.Decode(ctx, "followers.json", &c.fDiff.followers); err != nil {
+		log.Errorln("NewFollowDiff restore followers", err)
+	}
+
+	log.Debugln("NewFollowDiff restoring following")
+	c.fDiff.following = make(map[int64]goinsta.User)
+	if err := c.Decode(ctx, "following.json", &c.fDiff.following); err != nil {
+		log.Errorln("NewFollowDiff restore following", err)
+	}
+
+	log.Debugln("NewFollowDiff restoring followEvents")
+	if err := c.Decode(ctx, "followEvents.json", &c.fDiff.events); err != nil {
+		log.Errorln("FollowDiff restore followEvents", err)
+	}
+}
+
+// NewFollowDiff creates a new FollowDiff by calling the instagram api
+func (c *Client) newFollowDiff(ctx context.Context) error {
+	var err error
+	n := &FollowDiff{
+		events: c.fDiff.events,
+	}
+
+	log.Debugln("NewFollowDiff get followers")
+	n.followers, err = getUsers(c.insta.Account.Followers())
+	if err != nil {
+		return fmt.Errorf("NewFollowDiff get followers: %v", err)
+	}
+
+	log.Debugln("NewFollowDiff get following")
+	n.following, err = getUsers(c.insta.Account.Following())
+	if err != nil {
+		return fmt.Errorf("NewFollowDiff get following: %v", err)
+	}
+
+	log.Debugln("NewFollowDiff diffUsers")
+	n.GainedFollowers, n.LostFollowers = diffUsers(n.followers, c.fDiff.followers)
+	n.GainedFollowing, n.LostFollowing = diffUsers(n.following, c.fDiff.following)
+
+	log.Debugln("NewFollowDiff update events")
+	for _, u := range n.GainedFollowers {
+		n.events = append(n.events, FollowEvent{time.Now(), FEFollowerGained, u})
+	}
+	for _, u := range n.LostFollowers {
+		n.events = append(n.events, FollowEvent{time.Now(), FEFollowerLost, u})
+	}
+	for _, u := range n.GainedFollowing {
+		n.events = append(n.events, FollowEvent{time.Now(), FEFollowingGained, u})
+	}
+	for _, u := range n.LostFollowing {
+		n.events = append(n.events, FollowEvent{time.Now(), FEFollowingLost, u})
+	}
+
+	c.fDiff = n
+	return nil
+}
+
+func (c *Client) saveFollowDiff(ctx context.Context) {
+	if len(c.fDiff.GainedFollowers)+len(c.fDiff.GainedFollowing)+len(c.fDiff.LostFollowers)+len(c.fDiff.LostFollowing) > 0 {
+		log.Debugln("SaveFollowDiff save followEvents")
+		err := c.Encode(ctx, "followEvents.json", c.fDiff.events)
+		if err != nil {
+			log.Errorln("SaveFollowDiff save followEvents.json", err)
+		}
+	}
+
+	if len(c.fDiff.GainedFollowers)+len(c.fDiff.LostFollowers) > 0 {
+		log.Debugln("SaveFollowDiff save followers")
+		err := c.Encode(ctx, "followers.json", c.fDiff.followers)
+		if err != nil {
+			log.Errorln("SaveFollowDiff save followers.json", err)
+		}
+	}
+
+	if len(c.fDiff.GainedFollowing)+len(c.fDiff.LostFollowing) > 0 {
+		log.Debugln("SaveFollowDiff save following")
+		err := c.Encode(ctx, "following.json", c.fDiff.following)
+		if err != nil {
+			log.Errorln("SaveFollowDiff save following.json", err)
+		}
+	}
+}
+
+func (f *FollowDiff) print() {
+	fmt.Println("followers", len(f.followers), "following", len(f.following))
+	fmt.Println("gained followers", len(f.GainedFollowers), "lost followers", len(f.LostFollowers))
+	fmt.Println("started following", len(f.GainedFollowing), "stopped following", len(f.LostFollowing))
 }
 
 // getUsers pages through a users refernce and returns all of them
