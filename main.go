@@ -15,7 +15,7 @@ import (
 var (
 	Version = "set with -ldflags \"-X main.Verions=$VERSION\""
 
-	Headers = strings.Split(os.Getenv("HEADERS"), ",")
+	Headers = []string{"*"}
 	Origins = make(map[string]struct{})
 	Port    = os.Getenv("PORT")
 
