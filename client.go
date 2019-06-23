@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
-	"os"
 	"sync"
 
 	"cloud.google.com/go/storage"
@@ -224,24 +222,12 @@ func (c *Client) Encode(ctx context.Context, obj string, d interface{}) error {
 func (c *Client) saveInsta(ctx context.Context) {
 	log.Infoln("saveInsta starting")
 
-	log.Debugln("saveInsta exporting goinsta to goinsta.state")
-	err := c.insta.Export("goinsta.state")
-	if err != nil {
-		log.Errorln("saveInsta export goinsta to goinsta.state", err)
-	}
-
-	log.Debugln("saveInsta opening goinsta.state")
-	f, err := os.Open("goinsta.state")
-	if err != nil {
-		log.Errorln("saveInsta opening goinsta.state", err)
-	}
-	defer f.Close()
-
 	log.Debugln("saveInsta writing goinsta state to Storage")
 	w := c.buck.Object(c.statefile).NewWriter(ctx)
 	defer w.Close()
-	_, err = io.Copy(w, f)
+
+	err := goinsta.Export(c.insta, w)
 	if err != nil {
-		log.Errorln("saveInsta writing state to storage", err)
+		log.Errorln("saveInsta export to storage", err)
 	}
 }
