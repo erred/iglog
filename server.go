@@ -430,8 +430,8 @@ func (u Users) Strings() []string {
 		sss += "@" + us.Username + ": " + us.Name + "\n"
 		if i%10 == 9 {
 			ss = append(ss, sss)
+			sss = ""
 		}
-		sss = ""
 	}
 	if sss != "" {
 		ss = append(ss, sss)

@@ -14,7 +14,7 @@ import (
 var (
 	APIToken = os.Getenv("TELEGRAM_TOKEN")
 	Bucket   = os.Getenv("BUCKET")
-	Interval = 30 * time.Minute
+	Interval = 20 * time.Minute
 	SaveFile = "iglogbot.json"
 )
 
