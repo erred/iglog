@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -21,6 +20,8 @@ import (
 type Server struct {
 	bot   *tapi.BotAPI
 	store *storage.Client
+
+	sends chan tapi.MessageConfig
 
 	Chats
 }
@@ -39,6 +40,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 	s := &Server{
 		bot:   bot,
 		store: store,
+		sends: make(chan tapi.MessageConfig, 10),
 		Chats: NewChats(),
 	}
 
@@ -60,6 +62,15 @@ func (s *Server) Export(ctx context.Context) {
 	if err := json.NewEncoder(w).Encode(s); err != nil {
 		log.Errorln("Server.Export:", err)
 	}
+}
+
+func (s *Server) Sender() {
+	for m := range s.sends {
+		if _, err := s.bot.Send(m); err != nil {
+			log.Errorln("Server.Sends:", err)
+		}
+	}
+
 }
 
 func (s *Server) Respond() {
@@ -102,42 +113,58 @@ func (s *Server) Respond() {
 			if ud, ok := s.Chats[cid]; !ok {
 				txt = "Please login first"
 			} else {
-				txt = fmt.Sprintf("You are %v %v", ud.IG.Account.Username, ud.IG.Account.FullName)
+				txt = fmt.Sprintf("You are @%s %s", ud.IG.Account.Username, ud.IG.Account.FullName)
 			}
 
 		case "followers":
 			if ud, ok := s.Chats[cid]; !ok {
 				txt = "Please login first"
 			} else {
-				txt = ud.ListFollowers().String()
+				for _, msg := range ud.ListFollowers().Strings() {
+					s.sends <- tapi.NewMessage(cid, msg)
+				}
 			}
 
 		case "following":
 			if ud, ok := s.Chats[cid]; !ok {
 				txt = "Please login first"
 			} else {
-				txt = ud.ListFollowing().String()
+				for _, msg := range ud.ListFollowing().Strings() {
+					s.sends <- tapi.NewMessage(cid, msg)
+				}
 			}
 
 		case "mutual":
 			if ud, ok := s.Chats[cid]; !ok {
 				txt = "Please login first"
 			} else {
-				txt = ud.Mutual.List().String()
+				for _, msg := range ud.Mutual.List().Strings() {
+					s.sends <- tapi.NewMessage(cid, msg)
+				}
 			}
 
 		case "notfollower":
 			if ud, ok := s.Chats[cid]; !ok {
 				txt = "Please login first"
 			} else {
-				txt = ud.NotFollower.List().String()
+				for _, msg := range ud.NotFollower.List().Strings() {
+					s.sends <- tapi.NewMessage(cid, msg)
+				}
 			}
 
 		case "notfollowing":
 			if ud, ok := s.Chats[cid]; !ok {
 				txt = "Please login first"
 			} else {
-				txt = ud.NotFollowing.List().String()
+				for _, msg := range ud.NotFollowing.List().Strings() {
+					s.sends <- tapi.NewMessage(cid, msg)
+				}
+			}
+
+		case "export":
+			if up.Message.From.UserName == "seankhliao" {
+				s.Export(context.Background())
+				txt = "export done"
 			}
 
 		case "start", "help":
@@ -160,45 +187,27 @@ here's what I can do:
 /notfollower: list people who don't follow back
                         `
 		}
-
-		if _, err := s.bot.Send(tapi.NewMessage(cid, txt)); err != nil {
-			log.Errorln("Server.Respond send msg:", err)
+		if txt != "" {
+			s.sends <- tapi.NewMessage(cid, txt)
 		}
 	}
 
 }
 
 func (s *Server) Update() {
-	var wg sync.WaitGroup
-	sends := make(chan tapi.MessageConfig, 10)
-
-	go func() {
-		for m := range sends {
-			if _, err := s.bot.Send(m); err != nil {
-				log.Errorln("Server.update sends:", err)
-			}
-		}
-	}()
-
 	for cid, ud := range s.Chats {
-		wg.Add(1)
 		go func(cid int64, ud *UserData) {
-			defer wg.Done()
-
 			evs, err := ud.update()
 			if err != nil {
-				log.Errorln("Server.Update chats:", err)
+				log.Errorln("Server.Update:", err)
 				return
 			}
 			for _, e := range evs {
-				sends <- tapi.NewMessage(cid, e.String())
+				s.sends <- tapi.NewMessage(cid, e.String())
 			}
 			ud.Events = append(ud.Events, evs...)
 		}(cid, ud)
 	}
-
-	wg.Wait()
-	close(sends)
 }
 
 type Chats map[int64]*UserData
@@ -229,7 +238,7 @@ func (c Chats) logout(cid int64) error {
 		if ud.IG != nil {
 			err := ud.IG.Logout()
 			if err != nil {
-				return fmt.Errorf("Chats.login: %v", err)
+				return fmt.Errorf("Chats.logout: %v", err)
 			}
 			return nil
 		}
@@ -323,31 +332,31 @@ func (u *UserData) update() (Events, error) {
 	}
 
 	oldFollowers, oldFollowing := NewRawUsers(), NewRawUsers()
-	for id, u := range u.Mutual {
-		oldFollowers[id], oldFollowing[id] = u, u
+	for id, uu := range u.Mutual {
+		oldFollowers[id], oldFollowing[id] = uu, uu
 	}
-	for id, u := range u.NotFollowing {
-		oldFollowers[id] = u
+	for id, uu := range u.NotFollowing {
+		oldFollowers[id] = uu
 	}
-	for id, u := range u.NotFollower {
-		oldFollowing[id] = u
+	for id, uu := range u.NotFollower {
+		oldFollowing[id] = uu
 	}
 
 	evs := NewEvents()
 	egfwer, _, elfwer := intersect(newFollowers, oldFollowers)
-	for _, u := range egfwer {
-		evs = evs.Add(u, FollowerGained)
+	for _, uu := range egfwer {
+		evs = evs.Add(uu, FollowerGained)
 	}
-	for _, u := range elfwer {
-		evs = evs.Add(u, FollowerLost)
+	for _, uu := range elfwer {
+		evs = evs.Add(uu, FollowerLost)
 	}
 
 	egfwing, _, elfwing := intersect(newFollowing, oldFollowing)
-	for _, u := range egfwing {
-		evs = evs.Add(u, FollowingGained)
+	for _, uu := range egfwing {
+		evs = evs.Add(uu, FollowingGained)
 	}
-	for _, u := range elfwing {
-		evs = evs.Add(u, FollowingLost)
+	for _, uu := range elfwing {
+		evs = evs.Add(uu, FollowingLost)
 	}
 
 	u.NotFollowing, u.Mutual, u.NotFollower = intersect(newFollowers, newFollowing)
@@ -413,13 +422,21 @@ func (u Users) Sort() {
 		return u[i].Username < u[j].Username
 	})
 }
-func (u Users) String() string {
-	var b strings.Builder
-	b.WriteString("Total: " + strconv.Itoa(len(u)) + "\n")
-	for _, us := range u {
-		b.WriteString(us.Username + ": " + us.Name + "\n")
+func (u Users) Strings() []string {
+	var ss []string
+	ss = append(ss, "Total: "+strconv.Itoa(len(u))+"\n")
+	var sss string
+	for i, us := range u {
+		sss += "@" + us.Username + ": " + us.Name + "\n"
+		if i%10 == 9 {
+			ss = append(ss, sss)
+		}
+		sss = ""
 	}
-	return b.String()
+	if sss != "" {
+		ss = append(ss, sss)
+	}
+	return ss
 }
 
 type User struct {
@@ -456,15 +473,15 @@ func (e Event) String() string {
 	ev := " unknown"
 	switch e.E {
 	case FollowerGained:
-		ev = " +follower "
+		ev = "+follower"
 	case FollowerLost:
-		ev = " -follower "
+		ev = "-follower"
 	case FollowingGained:
-		ev = " +following "
+		ev = "+following"
 	case FollowingLost:
-		ev = " -following "
+		ev = "-following"
 	}
-	return e.T.Format("2006-01-02 15:04 -0700") + ev + e.U.Username + " " + e.U.FullName
+	return fmt.Sprintf("%s %s @%s %s", e.T.Format("2006-01-02 15:04 -0700"), ev, e.U.Username, e.U.FullName)
 }
 
 type EventType int

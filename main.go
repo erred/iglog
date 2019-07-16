@@ -50,6 +50,7 @@ func main() {
 	}
 	defer s.Export(ctx)
 
+	go s.Sender()
 	go s.Respond()
 	go func(d time.Duration) {
 		s.Update()
