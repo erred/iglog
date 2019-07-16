@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -13,17 +12,10 @@ import (
 )
 
 var (
-	Version = "set with -ldflags \"-X main.Verions=$VERSION\""
-
-	Headers = []string{"*"}
-	Origins = make(map[string]struct{})
-	Port    = os.Getenv("PORT")
-
-	StateFile = "state.goinsta"
-	Username  = os.Getenv("IG_USER")
-	Password  = os.Getenv("IG_PASS")
-	Bucket    = os.Getenv("BUCKET")
-	Emails    = make(map[string]struct{})
+	APIToken = os.Getenv("TELEGRAM_TOKEN")
+	Bucket   = os.Getenv("BUCKET")
+	Interval = 30 * time.Minute
+	SaveFile = "iglogbot.json"
 )
 
 func init() {
@@ -37,66 +29,39 @@ func init() {
 	default:
 		log.SetLevel(log.ErrorLevel)
 	}
-	log.Debugln("Log level set to", log.GetLevel())
+	log.Infoln("Log level set to", log.GetLevel())
 
 	switch strings.ToLower(os.Getenv("LOG_FORMAT")) {
 	case "json":
 		log.SetFormatter(&log.JSONFormatter{})
-		log.Debugln("Log format set to json")
+		log.Infoln("Log format set to json")
 	default:
 		log.SetFormatter(&log.TextFormatter{})
-		log.Debugln("Log format set to text")
-	}
-
-	for i, h := range Headers {
-		Headers[i] = strings.TrimSpace(h)
-	}
-
-	for _, o := range strings.Split(os.Getenv("ORIGINS"), ",") {
-		Origins[strings.TrimSpace(o)] = struct{}{}
-	}
-	if Port == "" {
-		Port = ":8080"
-	}
-
-	for _, e := range strings.Split(os.Getenv("EMAILS"), ",") {
-		Emails[strings.TrimSpace(e)] = struct{}{}
+		log.Infoln("Log format set to text")
 	}
 }
 
 func main() {
 	ctx := context.Background()
-	log.Infoln("main NewClient")
-	c, err := NewClient(ctx, Bucket, StateFile, Username, Password)
+
+	s, err := NewServer(ctx)
 	if err != nil {
-		log.Fatalln("main:", err)
+		log.Fatal("main:", err)
 	}
-	defer c.Shutdown(ctx)
+	defer s.Export(ctx)
 
-	var wg sync.WaitGroup
+	go s.Respond()
+	go func(d time.Duration) {
+		s.Update()
+		s.Export(ctx)
+		for range time.NewTicker(d).C {
+			s.Update()
+			s.Export(ctx)
+		}
+	}(Interval)
 
-	// start work
-	wg.Add(1)
-	go tick(ctx, time.Hour, c.FollowDiff, &wg)
-	go func() {
-		wg.Wait()
-		c.ready = true
-	}()
-
-	// spin off server
-	go c.svr.ListenAndServe()
-
-	// block on waiting for signal
-	log.Infoln("main waiting")
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGKILL)
-	<-sigs
-}
-
-func tick(ctx context.Context, d time.Duration, f func(context.Context), wg *sync.WaitGroup) {
-	f(ctx)
-	wg.Done()
-	for range time.NewTicker(d).C {
-		f(ctx)
-	}
+	sig := <-sigs
+	log.Errorln("main got signal:", sig)
 }
