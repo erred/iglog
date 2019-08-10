@@ -1,4 +1,4 @@
-module github.com/seankhliao/iglog
+module seankhliao.com/iglog
 
 go 1.12
 
