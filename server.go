@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/ahmdrz/goinsta"
+	goinsta "github.com/ahmdrz/goinsta/v2"
 	log "github.com/sirupsen/logrus"
 
 	tapi "github.com/go-telegram-bot-api/telegram-bot-api"
