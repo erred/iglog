@@ -1,8 +1,11 @@
 .dockerignore
-.git
+.git/
 .gitignore
 
 cloudbuild.yaml
+deploy/
 Dockerfile
 LICENSE
+Makefile
 README.md
+testdata

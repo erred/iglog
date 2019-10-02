@@ -5,10 +5,9 @@ package iam
 
 import (
 	fmt "fmt"
-	math "math"
-
 	proto "github.com/golang/protobuf/proto"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -25,9 +24,13 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 // Encapsulates settings provided to GetIamPolicy.
 type GetPolicyOptions struct {
 	// Optional. The policy format version to be returned.
-	// Acceptable values are 0 and 1.
-	// If the value is 0, or the field is omitted, policy format version 1 will be
-	// returned.
+	//
+	// Valid values are 0, 1, and 3. Requests specifying an invalid value will be
+	// rejected.
+	//
+	// Requests for policies with any conditional bindings must specify version 3.
+	// Policies without any conditional bindings may specify any valid value or
+	// leave the field unset.
 	RequestedPolicyVersion int32    `protobuf:"varint,1,opt,name=requested_policy_version,json=requestedPolicyVersion,proto3" json:"requested_policy_version,omitempty"`
 	XXX_NoUnkeyedLiteral   struct{} `json:"-"`
 	XXX_unrecognized       []byte   `json:"-"`

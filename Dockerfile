@@ -1,13 +1,15 @@
 FROM golang:alpine AS build
 
+ENV CGO_ENABLED=0
 WORKDIR /app
 RUN apk add --no-cache ca-certificates
 COPY . .
-RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -o app
+RUN go build -mod=vendor -o /bin/app
+
 
 FROM scratch
 
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=build /app/app /bin/
+COPY --from=build /bin/app /
 
-ENTRYPOINT ["/bin/app"]
+ENTRYPOINT ["/app"]
