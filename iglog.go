@@ -10,6 +10,7 @@ import (
 	goinsta "github.com/ahmdrz/goinsta/v2"
 )
 
+// IG holds authorization to use the Instagram api
 type IG struct {
 	*goinsta.Instagram
 }
@@ -18,7 +19,7 @@ func (i *IG) MarshalJSON() ([]byte, error) {
 	b := &bytes.Buffer{}
 	err := goinsta.Export(i.Instagram, b)
 	if err != nil {
-		err = fmt.Errorf("IG MarshalJSON: %v", err)
+		err = fmt.Errorf("IG.MarshalJSON: %v", err)
 	}
 	return b.Bytes(), err
 }
@@ -27,11 +28,12 @@ func (i *IG) UnmarshalJSON(b []byte) error {
 	var err error
 	i.Instagram, err = goinsta.ImportReader(bytes.NewReader(b))
 	if err != nil {
-		err = fmt.Errorf("IG UnmarshalJSON: %v", err)
+		err = fmt.Errorf("IG.UnmarshalJSON: %v", err)
 	}
 	return err
 }
 
+// UserData holds the followers for a single user
 type UserData struct {
 	IG *IG
 
@@ -57,6 +59,7 @@ func NewUserData(user, pass string) (*UserData, error) {
 	}, nil
 }
 
+// ListFollowers gets a user's followers, sorted by username
 func (u UserData) ListFollowers() Users {
 	var us Users
 	for _, gu := range u.Mutual {
@@ -71,6 +74,7 @@ func (u UserData) ListFollowers() Users {
 	return us
 }
 
+// ListFollowing gets a user's following, sorted by username
 func (u UserData) ListFollowing() Users {
 	var us Users
 	for _, gu := range u.NotFollower {
@@ -85,6 +89,7 @@ func (u UserData) ListFollowing() Users {
 	return us
 }
 
+// Update attempts to update a user's followers / following
 func (u *UserData) Update() (Events, error) {
 	newFollowers, err := getUsers(u.IG.Account.Followers())
 	if err != nil {
