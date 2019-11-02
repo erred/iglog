@@ -5,33 +5,11 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	goinsta "github.com/ahmdrz/goinsta/v2"
 )
-
-// IG holds authorization to use the Instagram api
-type IG struct {
-	*goinsta.Instagram
-}
-
-func (i *IG) MarshalJSON() ([]byte, error) {
-	b := &bytes.Buffer{}
-	err := goinsta.Export(i.Instagram, b)
-	if err != nil {
-		err = fmt.Errorf("IG.MarshalJSON: %v", err)
-	}
-	return b.Bytes(), err
-}
-
-func (i *IG) UnmarshalJSON(b []byte) error {
-	var err error
-	i.Instagram, err = goinsta.ImportReader(bytes.NewReader(b))
-	if err != nil {
-		err = fmt.Errorf("IG.UnmarshalJSON: %v", err)
-	}
-	return err
-}
 
 // UserData holds the followers for a single user
 type UserData struct {
@@ -232,6 +210,14 @@ func (e Events) Add(u goinsta.User, ev EventType) Events {
 	})
 }
 
+func (e Events) String() string {
+	var s strings.Builder
+	for _, ev := range e {
+		s.WriteString(ev.String() + "\n")
+	}
+	return s.String()
+}
+
 type Event struct {
 	T time.Time
 	E EventType
@@ -261,3 +247,26 @@ const (
 	FollowingGained
 	FollowingLost
 )
+
+// IG holds authorization to use the Instagram api
+type IG struct {
+	*goinsta.Instagram
+}
+
+func (i *IG) MarshalJSON() ([]byte, error) {
+	b := &bytes.Buffer{}
+	err := goinsta.Export(i.Instagram, b)
+	if err != nil {
+		err = fmt.Errorf("IG.MarshalJSON: %v", err)
+	}
+	return b.Bytes(), err
+}
+
+func (i *IG) UnmarshalJSON(b []byte) error {
+	var err error
+	i.Instagram, err = goinsta.ImportReader(bytes.NewReader(b))
+	if err != nil {
+		err = fmt.Errorf("IG.UnmarshalJSON: %v", err)
+	}
+	return err
+}

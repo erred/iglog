@@ -695,7 +695,8 @@ func (ua *BucketAttrsToUpdate) toRawBucket() *raw.Bucket {
 	if ua.BucketPolicyOnly != nil {
 		rb.IamConfiguration = &raw.BucketIamConfiguration{
 			BucketPolicyOnly: &raw.BucketIamConfigurationBucketPolicyOnly{
-				Enabled: ua.BucketPolicyOnly.Enabled,
+				Enabled:         ua.BucketPolicyOnly.Enabled,
+				ForceSendFields: []string{"Enabled"},
 			},
 		}
 	}
@@ -1045,13 +1046,8 @@ func (b *BucketHandle) Objects(ctx context.Context, q *Query) *ObjectIterator {
 	}
 	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
 		it.fetch,
-		func() int { return len(it.items) - it.index },
-		func() interface{} {
-			b := it.items
-			it.items = nil
-			it.index = 0
-			return b
-		})
+		func() int { return len(it.items) },
+		func() interface{} { b := it.items; it.items = nil; return b })
 	if q != nil {
 		it.query = *q
 	}
@@ -1068,7 +1064,6 @@ type ObjectIterator struct {
 	pageInfo *iterator.PageInfo
 	nextFunc func() error
 	items    []*ObjectAttrs
-	index    int
 }
 
 // PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
@@ -1089,10 +1084,8 @@ func (it *ObjectIterator) Next() (*ObjectAttrs, error) {
 	if err := it.nextFunc(); err != nil {
 		return nil, err
 	}
-
-	item := it.items[it.index]
-	it.index++
-
+	item := it.items[0]
+	it.items = it.items[1:]
 	return item, nil
 }
 
@@ -1145,13 +1138,9 @@ func (c *Client) Buckets(ctx context.Context, projectID string) *BucketIterator 
 	}
 	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
 		it.fetch,
-		func() int { return len(it.buckets) - it.index },
-		func() interface{} {
-			b := it.buckets
-			it.buckets = nil
-			it.index = 0
-			return b
-		})
+		func() int { return len(it.buckets) },
+		func() interface{} { b := it.buckets; it.buckets = nil; return b })
+
 	return it
 }
 
@@ -1168,7 +1157,6 @@ type BucketIterator struct {
 	buckets   []*BucketAttrs
 	pageInfo  *iterator.PageInfo
 	nextFunc  func() error
-	index     int
 }
 
 // Next returns the next result. Its second return value is iterator.Done if
@@ -1180,10 +1168,8 @@ func (it *BucketIterator) Next() (*BucketAttrs, error) {
 	if err := it.nextFunc(); err != nil {
 		return nil, err
 	}
-
-	b := it.buckets[it.index]
-	it.index++
-
+	b := it.buckets[0]
+	it.buckets = it.buckets[1:]
 	return b, nil
 }
 
