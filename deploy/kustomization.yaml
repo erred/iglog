@@ -1,5 +1,0 @@
-commonLabels:
-  app: iglogbot
-resources:
-  - deployment.yaml
-  - serviceaccount.yaml
