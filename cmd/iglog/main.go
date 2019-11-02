@@ -49,10 +49,12 @@ func main() {
 		if err != nil {
 			log.Fatal().Str("file", "iglog.json").Err(err).Msg("failed to read")
 		}
-		err = json.Unmarshal(b, ud)
+		var udd iglog.UserData
+		err = json.Unmarshal(b, &udd)
 		if err != nil {
 			log.Fatal().Str("obj", "ud").Err(err).Msg("failed to unmarshal")
 		}
+		ud = &udd
 	}
 	defer func() {
 		b, err := json.Marshal(ud)
@@ -85,4 +87,23 @@ func main() {
 	if err != nil {
 		log.Error().Str("file", "events.log").Err(err).Msg("failed to write file")
 	}
+
+	buf = &bytes.Buffer{}
+	for _, f := range ud.ListFollowers() {
+		buf.WriteString(f.Username + "\n")
+	}
+	err = ioutil.WriteFile("followers.log", buf.Bytes(), 0644)
+	if err != nil {
+		log.Error().Str("file", "followers.log").Err(err).Msg("failed to write file")
+	}
+
+	buf = &bytes.Buffer{}
+	for _, f := range ud.ListFollowing() {
+		buf.WriteString(f.Username + "\n")
+	}
+	err = ioutil.WriteFile("following.log", buf.Bytes(), 0644)
+	if err != nil {
+		log.Error().Str("file", "following.log").Err(err).Msg("failed to write file")
+	}
+
 }
