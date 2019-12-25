@@ -25,7 +25,7 @@ func initLog() {
 	if level == zerolog.NoLevel {
 		level = zerolog.InfoLevel
 	}
-	log.Info().Str("FMT", logfmt).Str("LVL", level.String()).Msg("log initialized")
+	// log.Info().Str("FMT", logfmt).Str("LVL", level.String()).Msg("log initialized")
 	zerolog.SetGlobalLevel(level)
 }
 
@@ -57,7 +57,7 @@ func main() {
 		ud = &udd
 	}
 	defer func() {
-		b, err := json.Marshal(ud)
+		b, err := json.MarshalIndent(ud, "", "    ")
 		if err != nil {
 			log.Fatal().Str("obj", "ud").Err(err).Msg("failed to marshal")
 		}
