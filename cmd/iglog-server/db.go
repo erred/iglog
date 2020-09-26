@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"time"
 
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
@@ -80,12 +80,11 @@ CREATE TABLE IF NOT EXISTS events (
 		err = row.Scan(s.IG)
 		if errors.Is(err, pgx.ErrNoRows) {
 			s.log.Debug().Str("initstate", s.initstate).Msg("no previous state found")
-			f, err := os.Open(s.initstate)
+			b, err := ioutil.ReadFile(s.initstate)
 			if err != nil {
-				return fmt.Errorf("open initstate file=%s: %w", s.initstate, err)
+				return fmt.Errorf("read initstate file=%s: %w", s.initstate, err)
 			}
-			defer f.Close()
-			err = json.NewDecoder(f).Decode(s.IG)
+			err = json.Unmarshal(b, &s.IG)
 			if err != nil {
 				return fmt.Errorf("decode initstate file=%s: %w", s.initstate, err)
 			}
