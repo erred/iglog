@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"path"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ahmdrz/goinsta/v2"
@@ -38,7 +37,6 @@ type Server struct {
 	log    zerolog.Logger
 	tracer trace.Tracer
 
-	ready     int64 // use atomic
 	mu        sync.Mutex
 	following int64
 	followers int64
@@ -63,9 +61,6 @@ func (s *Server) Register(c *usvc.Components) error {
 	)
 
 	bo := c.Meter.NewBatchObserver(func(ctx context.Context, bor metric.BatchObserverResult) {
-		if atomic.LoadInt64(&s.ready) == 0 {
-			return
-		}
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		bor.Observe(
@@ -94,7 +89,7 @@ func (s *Server) Register(c *usvc.Components) error {
 		return fmt.Errorf("setup db: %w", err)
 	}
 
-	go s.updater()
+	go s.updater(context.Background())
 	return nil
 }
 
@@ -103,9 +98,10 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) updater() {
+func (s *Server) updater(ctx context.Context) {
+	s.log.Info().Dur("interval", s.interval).Msg("starting updater")
 	for {
-		err := s.update()
+		err := s.update(ctx)
 		if err != nil {
 			s.log.Error().Err(err).Msg("update")
 		}
@@ -113,9 +109,8 @@ func (s *Server) updater() {
 	}
 }
 
-func (s *Server) update() error {
-	ctx := context.Background()
-
+func (s *Server) update(ctx context.Context) error {
+	s.log.Info().Msg("starting update")
 	// get users
 	newFollowers, err := getUsersPage(s.IG.Account.Followers())
 	if err != nil {
@@ -125,6 +120,7 @@ func (s *Server) update() error {
 	if err != nil {
 		return fmt.Errorf("update get following: %w", err)
 	}
+	s.log.Info().Int("followers", len(newFollowers)).Int("following", len(newFollowing)).Msg("update got from ig")
 
 	s.mu.Lock()
 	s.followers = int64(len(newFollowers))
@@ -149,6 +145,12 @@ func (s *Server) update() error {
 			return fmt.Errorf("get old following: %w", err)
 		}
 
+		// diff users
+		lostFollowers, _, gainedFollowers := intersect(oldFollowers, newFollowers)
+		lostFollowing, _, gainedFollowing := intersect(oldFollowing, newFollowing)
+		s.log.Info().Strs("follower-", usernames(lostFollowers)).Strs("follower+", usernames(gainedFollowers)).
+			Strs("following-", usernames(lostFollowing)).Strs("following+", usernames(gainedFollowing)).Msg("diff")
+
 		// save users
 		err = upsertUsersDB(ctx, tx, newFollowers, true, false)
 		if err != nil {
@@ -159,9 +161,7 @@ func (s *Server) update() error {
 			return fmt.Errorf("update following: %w", err)
 		}
 
-		// diff users, save events
-		lostFollowers, _, gainedFollowers := intersect(oldFollowers, newFollowers)
-		lostFollowing, _, gainedFollowing := intersect(oldFollowing, newFollowing)
+		// save events
 		err = insertEvents(ctx, tx, []map[int64]goinsta.User{lostFollowers, gainedFollowers, lostFollowing, gainedFollowing})
 		if err != nil {
 			return fmt.Errorf("update events: %w", err)
@@ -169,8 +169,9 @@ func (s *Server) update() error {
 		return nil
 	})
 	if err != nil {
-		s.log.Error().Err(err).Msg("update db")
+		return fmt.Errorf("update db: %w", err)
 	}
+	s.log.Info().Msg("update complete")
 	return nil
 }
 
@@ -297,4 +298,12 @@ func intersect(one, two map[int64]goinsta.User) (only1, both, only2 map[int64]go
 		}
 	}
 	return only1, both, only2
+}
+
+func usernames(us map[int64]goinsta.User) []string {
+	uns := make([]string, 0, len(us))
+	for _, v := range us {
+		uns = append(uns, v.Username)
+	}
+	return uns
 }
