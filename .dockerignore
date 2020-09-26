@@ -1,11 +1,11 @@
 .dockerignore
 .git/
+.github/
 .gitignore
 
 cloudbuild.yaml
-deploy/
 Dockerfile
+k8s/
 LICENSE
 Makefile
 README.md
-testdata

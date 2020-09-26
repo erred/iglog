@@ -1,0 +1,33 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/name: iglog
+  name: iglog
+spec:
+  secretName: iglog-cert
+  duration: 87600h # 10 years
+  renewBefore: 360h
+  dnsNames:
+    - "iglog"
+    - "iglog.default"
+    - "iglog.default.svc"
+    - "iglog.default.svc.cluster.local"
+  issuerRef:
+    name: internal-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cockroachdb-client-iglog
+spec:
+  secretName: cockroachdb-client-iglog
+  duration: 2160h
+  renewBefore: 360h
+  commonName: iglog
+  usages:
+    - client auth
+  issuerRef:
+    name: internal-ca
+    kind: ClusterIssuer
