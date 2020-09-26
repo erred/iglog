@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -79,7 +78,7 @@ CREATE TABLE IF NOT EXISTS events (
 		// TODO: insert initial data
 		row := tx.QueryRow(ctx, `SELECT state FROM goinsta WHERE id = 1 LIMIT 1`)
 		err = row.Scan(s.IG)
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			f, err := os.Open(s.initstate)
 			if err != nil {
 				return err
@@ -96,6 +95,22 @@ CREATE TABLE IF NOT EXISTS events (
 		} else if err != nil {
 			return err
 		}
+
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		row = tx.QueryRow(ctx, `SELECT count(uid) FROM users WHERE follower = true`)
+		err = row.Scan(&s.followers)
+		if err != nil {
+			return err
+		}
+
+		row = tx.QueryRow(ctx, `SELECT count(uid) FROM users WHERE following = true`)
+		err = row.Scan(&s.following)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
