@@ -135,28 +135,28 @@ func (s *Server) update() error {
 		// save state
 		_, err := tx.Exec(ctx, `UPDATE goinsta SET state = $1, timestamp = $2 WHERE id = 1;`, s.IG, time.Now())
 		if err != nil {
-			return err
+			return fmt.Errorf("update state: %w", err)
 		}
 
 		// get old users
 		oldFollowers, err := getUsersDB(ctx, tx, true, false)
 		if err != nil {
-			return err
+			return fmt.Errorf("get old followers: %w", err)
 		}
 
 		oldFollowing, err := getUsersDB(ctx, tx, false, true)
 		if err != nil {
-			return err
+			return fmt.Errorf("get old following: %w", err)
 		}
 
 		// save users
 		err = upsertUsersDB(ctx, tx, newFollowers, true, false)
 		if err != nil {
-			return err
+			return fmt.Errorf("update followers: %w", err)
 		}
 		err = upsertUsersDB(ctx, tx, newFollowing, false, true)
 		if err != nil {
-			return err
+			return fmt.Errorf("update following: %w", err)
 		}
 
 		// diff users, save events
@@ -164,7 +164,7 @@ func (s *Server) update() error {
 		lostFollowing, _, gainedFollowing := intersect(oldFollowing, newFollowing)
 		err = insertEvents(ctx, tx, []map[int64]goinsta.User{lostFollowers, gainedFollowers, lostFollowing, gainedFollowing})
 		if err != nil {
-			return err
+			return fmt.Errorf("update events: %w", err)
 		}
 		return nil
 	})
@@ -183,18 +183,18 @@ func (i *IG) MarshalJSON() ([]byte, error) {
 	var b bytes.Buffer
 	err := goinsta.Export(i.Instagram, &b)
 	if err != nil {
-		err = fmt.Errorf("IG.MarshalJSON: %v", err)
+		return nil, fmt.Errorf("IG.MarshalJSON: %v", err)
 	}
-	return b.Bytes(), err
+	return b.Bytes(), nil
 }
 
 func (i *IG) UnmarshalJSON(b []byte) error {
 	var err error
 	i.Instagram, err = goinsta.ImportReader(bytes.NewReader(b))
 	if err != nil {
-		err = fmt.Errorf("IG.UnmarshalJSON: %v", err)
+		return fmt.Errorf("IG.UnmarshalJSON: %v", err)
 	}
-	return err
+	return nil
 }
 
 func getUsersPage(u *goinsta.Users) (map[int64]goinsta.User, error) {
@@ -209,19 +209,22 @@ func getUsersPage(u *goinsta.Users) (map[int64]goinsta.User, error) {
 		} else if err != nil {
 			return nil, fmt.Errorf("getUsers: %v", err)
 		}
-
-		if err := u.Error(); err == goinsta.ErrNoMore {
-			break
-		} else if err != nil {
-		}
 	}
 	return users, nil
 }
 
 func getUsersDB(ctx context.Context, tx pgx.Tx, followers, following bool) (map[int64]goinsta.User, error) {
-	rows, err := tx.Query(ctx, `SELECT uid, state FROM users WHERE follower = $1 AND following = $2`, followers, following)
+	sqlstr := `SELECT uid, state FROM users WHERE %s = true`
+	if followers {
+		sqlstr = fmt.Sprintf(sqlstr, "follower")
+	} else if following {
+		sqlstr = fmt.Sprintf(sqlstr, "following")
+	} else {
+		return nil, fmt.Errorf("getUsersDB unknown combo following=%v followers=%v", following, followers)
+	}
+	rows, err := tx.Query(ctx, sqlstr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getUsersDB query following=%v followers=%v: %w", following, followers, err)
 	}
 	defer rows.Close()
 
@@ -231,7 +234,7 @@ func getUsersDB(ctx context.Context, tx pgx.Tx, followers, following bool) (map[
 		var state goinsta.User
 		err := rows.Scan(&user, &state)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getUsersDB scan: %w", err)
 		}
 		users[user] = state
 	}
@@ -248,12 +251,12 @@ func upsertUsersDB(ctx context.Context, tx pgx.Tx, users map[int64]goinsta.User,
 	} else if following {
 		sqlstr = fmt.Sprintf(sqlstr, "following")
 	} else {
-		return fmt.Errorf("unknown combo following=%v followers=%v", following, followers)
+		return fmt.Errorf("upsertUsersDB unknown combo following=%v followers=%v", following, followers)
 	}
 	for uid, user := range users {
 		_, err := tx.Exec(ctx, sqlstr, uid, true, user.Username, user)
 		if err != nil {
-			return err
+			return fmt.Errorf("upsertUsersDB exec: %w", err)
 		}
 	}
 	return nil
@@ -272,7 +275,7 @@ func insertEvents(ctx context.Context, tx pgx.Tx, events []map[int64]goinsta.Use
 				uid,
 			)
 			if err != nil {
-				return err
+				return fmt.Errorf("insertEvents %s: %w", order[i], err)
 			}
 		}
 	}

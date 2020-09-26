@@ -17,7 +17,7 @@ import (
 func ExecuteTx(ctx context.Context, pool *pgxpool.Pool, txOpts pgx.TxOptions, fn func(pgx.Tx) error) error {
 	tx, err := pool.BeginTx(ctx, txOpts)
 	if err != nil {
-		return err
+		return fmt.Errorf("ExecuteTx: %w", err)
 	}
 	return crdb.ExecuteInTx(ctx, pgxTxAdapter{tx}, func() error { return fn(tx) })
 }
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS goinsta (
 	timestamp TIMESTAMP
 )`)
 		if err != nil {
-			return err
+			return fmt.Errorf("create goinsta table: %w", err)
 		}
 		_, err = tx.Exec(ctx, `
 CREATE TABLE IF NOT EXISTS users (
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS users (
 	data JSONB
 )`)
 		if err != nil {
-			return err
+			return fmt.Errorf("create users table: %w", err)
 		}
 		_, err = tx.Exec(ctx, `
 CREATE TABLE IF NOT EXISTS events (
@@ -72,28 +72,29 @@ CREATE TABLE IF NOT EXISTS events (
 	uid INTEGER
 )`)
 		if err != nil {
-			return err
+			return fmt.Errorf("create events table: %w", err)
 		}
 
 		// TODO: insert initial data
-		row := tx.QueryRow(ctx, `SELECT state FROM goinsta WHERE id = 1 LIMIT 1`)
+		row := tx.QueryRow(ctx, `SELECT state FROM goinsta WHERE id = 1`)
 		err = row.Scan(s.IG)
 		if errors.Is(err, pgx.ErrNoRows) {
+			s.log.Debug().Str("initstate", s.initstate).Msg("no previous state found")
 			f, err := os.Open(s.initstate)
 			if err != nil {
-				return err
+				return fmt.Errorf("open initstate file=%s: %w", s.initstate, err)
 			}
 			defer f.Close()
 			err = json.NewDecoder(f).Decode(s.IG)
 			if err != nil {
-				return err
+				return fmt.Errorf("decode initstate file=%s: %w", s.initstate, err)
 			}
-			_, err = tx.Exec(ctx, `INSERT INTO goinsta VALUES (1, $1, $2)`, s.IG, time.Now().Add(-s.interval))
+			_, err = tx.Exec(ctx, `INSERT INTO goinsta (id, state, timestamp) VALUES (1, $1, $2)`, s.IG, time.Now().Add(-s.interval))
 			if err != nil {
-				return err
+				return fmt.Errorf("insert initstate: %w", err)
 			}
 		} else if err != nil {
-			return err
+			return fmt.Errorf("get previous state: %w", err)
 		}
 
 		s.mu.Lock()
@@ -102,15 +103,16 @@ CREATE TABLE IF NOT EXISTS events (
 		row = tx.QueryRow(ctx, `SELECT count(uid) FROM users WHERE follower = true`)
 		err = row.Scan(&s.followers)
 		if err != nil {
-			return err
+			return fmt.Errorf("get previous followers count: %w", err)
 		}
 
 		row = tx.QueryRow(ctx, `SELECT count(uid) FROM users WHERE following = true`)
 		err = row.Scan(&s.following)
 		if err != nil {
-			return err
+			return fmt.Errorf("get previous following count: %w", err)
 		}
 
+		s.log.Info().Int64("followers", s.followers).Int64("following", s.following).Msg("got previous counts")
 		return nil
 	})
 	if err != nil {
