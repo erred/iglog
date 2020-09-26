@@ -86,7 +86,6 @@ CREATE TABLE IF NOT EXISTS events (
 			}
 			err = json.Unmarshal(b, &s.IG)
 			if err != nil {
-				fmt.Println(string(b))
 				return fmt.Errorf("decode initstate file=%s: %w", s.initstate, err)
 			}
 			_, err = tx.Exec(ctx, `INSERT INTO goinsta (id, state, timestamp) VALUES (1, $1, $2)`, s.IG, time.Now().Add(-s.interval))

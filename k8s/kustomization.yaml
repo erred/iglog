@@ -4,6 +4,9 @@ resources:
   - cert.yaml
   - service.yaml
   - deployment.yaml
+# # manual deployment only
+# # ci pipeline does not have git/gitattributes filter
+# # to decode the encrypted file
 # secretGenerator:
 #   - name: iglog-initstate
 #     files:
