@@ -214,7 +214,7 @@ func getUsersPage(u *goinsta.Users) (map[int64]goinsta.User, error) {
 }
 
 func getUsersDB(ctx context.Context, tx pgx.Tx, followers, following bool) (map[int64]goinsta.User, error) {
-	sqlstr := `SELECT uid, state FROM users WHERE %s = true`
+	sqlstr := `SELECT uid, data FROM users WHERE %s = true`
 	if followers {
 		sqlstr = fmt.Sprintf(sqlstr, "follower")
 	} else if following {

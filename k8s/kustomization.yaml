@@ -4,10 +4,10 @@ resources:
   - cert.yaml
   - service.yaml
   - deployment.yaml
-secretGenerator:
-  - name: iglog-initstate
-    files:
-      - config/iglog.json
+# secretGenerator:
+#   - name: iglog-initstate
+#     files:
+#       - config/iglog.json
 images:
   - name: us.gcr.io/com-seankhliao/iglog
     # newTag: IMAGE_TAG
