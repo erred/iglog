@@ -110,7 +110,7 @@ func (s *Server) updater(ctx context.Context) {
 }
 
 func (s *Server) update(ctx context.Context) error {
-	s.log.Info().Msg("starting update")
+	s.log.Info().Str("account", s.IG.Account.Username).Msg("starting update")
 	// get users
 	newFollowers, err := getUsersPage(s.IG.Account.Followers())
 	if err != nil {
@@ -204,12 +204,10 @@ func getUsersPage(u *goinsta.Users) (map[int64]goinsta.User, error) {
 		for _, uu := range u.Users {
 			users[uu.ID] = uu
 		}
-		err := u.Error()
-		if errors.Is(err, goinsta.ErrNoMore) {
-			break
-		} else if err != nil {
-			return nil, fmt.Errorf("getUsers: %v", err)
-		}
+	}
+	err := u.Error()
+	if err != nil && !errors.Is(err, goinsta.ErrNoMore) {
+		return nil, fmt.Errorf("getUsers: %w", err)
 	}
 	return users, nil
 }
