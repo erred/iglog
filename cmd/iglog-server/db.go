@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS events (
 
 		// TODO: insert initial data
 		row := tx.QueryRow(ctx, `SELECT state FROM goinsta WHERE id = 1`)
-		err = row.Scan(s.IG)
+		err = row.Scan(&s.IG)
 		if errors.Is(err, pgx.ErrNoRows) {
 			s.log.Debug().Str("initstate", s.initstate).Msg("no previous state found")
 			b, err := ioutil.ReadFile(s.initstate)
