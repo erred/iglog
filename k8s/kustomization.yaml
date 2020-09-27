@@ -4,13 +4,15 @@ resources:
   - cert.yaml
   - service.yaml
   - deployment.yaml
-# # manual deployment only
-# # ci pipeline does not have git/gitattributes filter
-# # to decode the encrypted file
-# secretGenerator:
-#   - name: iglog-initstate
-#     files:
-#       - config/iglog.json
+# manual deployment only
+# ci pipeline does not have git/gitattributes filter
+# to decode the encrypted file
+# patchesStrategicMerge:
+#   - add_initstate.yaml
+secretGenerator:
+  - name: iglog-initstate
+    files:
+      - config/iglog.json
 images:
   - name: us.gcr.io/com-seankhliao/iglog
     # newTag: IMAGE_TAG
