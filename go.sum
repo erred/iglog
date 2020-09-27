@@ -310,8 +310,8 @@ go.opentelemetry.io/otel/sdk v0.12.0 h1:YVUyDXsGvFWjhJxGXT4kBcGdfoTbo1vSGjbGRUdR
 go.opentelemetry.io/otel/sdk v0.12.0/go.mod h1:u3joRdxhrS1hUf9xSFH8vgdXdujQ3jxXxZl3loZFSqs=
 go.seankhliao.com/apis v0.0.0-20200925201609-7c5465abda54 h1:n4yW+JCLdLKPDZLc6KUnfRgDJrjtZ606djunL3ygYWE=
 go.seankhliao.com/apis v0.0.0-20200925201609-7c5465abda54/go.mod h1:qFACqbCaFLY/Wng7UsjWe3JaeHixJfducJljCsKSpDg=
-go.seankhliao.com/usvc v0.8.6 h1:ockh0CWfyXInFKflOCaLwxvTInTaMSmNB+Jp5HjMxeY=
-go.seankhliao.com/usvc v0.8.6/go.mod h1:ES6/s1yWOIfuVdAeqObikvKJvt4gCZNqX8a4k05KdeQ=
+go.seankhliao.com/usvc v0.8.7 h1:s0jKjuhdL9jcMRIsOvCky6vqKXnJCa16BUkz+DU4NHs=
+go.seankhliao.com/usvc v0.8.7/go.mod h1:ES6/s1yWOIfuVdAeqObikvKJvt4gCZNqX8a4k05KdeQ=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.6.0/go.mod h1:sABNBOSYdrvTF6hTgEIbc7YasKWGhgEQZyfxyTvoXHQ=
