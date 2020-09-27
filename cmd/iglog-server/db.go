@@ -99,19 +99,23 @@ CREATE TABLE IF NOT EXISTS events (
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
+		var followers, following int64
 		row = tx.QueryRow(ctx, `SELECT count(uid) FROM users WHERE follower = true`)
-		err = row.Scan(&s.followers)
+		err = row.Scan(&followers)
 		if err != nil {
 			return fmt.Errorf("get previous followers count: %w", err)
 		}
 
 		row = tx.QueryRow(ctx, `SELECT count(uid) FROM users WHERE following = true`)
-		err = row.Scan(&s.following)
+		err = row.Scan(&following)
 		if err != nil {
 			return fmt.Errorf("get previous following count: %w", err)
 		}
 
-		s.log.Info().Int64("followers", s.followers).Int64("following", s.following).Msg("got previous counts")
+		s.followers.Set(float64(followers))
+		s.following.Set(float64(following))
+
+		s.log.Info().Int64("followers", followers).Int64("following", following).Msg("got previous counts")
 		return nil
 	})
 	if err != nil {

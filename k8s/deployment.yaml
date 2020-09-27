@@ -32,8 +32,6 @@ spec:
           image: us.gcr.io/com-seankhliao/iglog:latest
           args:
             - -db=postgresql://iglog@cockroachdb.default.svc.cluster.local:26257/iglog?sslmode=verify-full&sslrootcert=/var/secret/cockroachdb/ca.crt&sslcert=/var/secret/cockroachdb/tls.crt&sslkey=/var/secret/cockroachdb/tls.key
-            - -tls.crt=/var/secret/tls/tls.crt
-            - -tls.key=/var/secret/tls/tls.key
           ports:
             - name: grpc
               containerPort: 8080
@@ -41,11 +39,11 @@ spec:
               containerPort: 8000
           livenessProbe:
             httpGet:
-              path: /health
+              path: /liveliness
               port: 8000
           readinessProbe:
             httpGet:
-              path: /health
+              path: /readiness
               port: 8000
           volumeMounts:
             - name: certs

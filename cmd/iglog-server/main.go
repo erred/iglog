@@ -6,15 +6,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"path"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/ahmdrz/goinsta/v2"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel/api/metric"
+	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/api/trace"
 	"go.seankhliao.com/usvc"
 )
@@ -24,7 +26,7 @@ const (
 )
 
 func main() {
-	usvc.Run(context.Background(), name, &Server{}, true)
+	os.Exit(usvc.Exec(context.Background(), &Server{}, os.Args))
 }
 
 type Server struct {
@@ -38,63 +40,37 @@ type Server struct {
 	tracer trace.Tracer
 
 	mu        sync.Mutex
-	following int64
-	followers int64
+	following prometheus.Gauge
+	followers prometheus.Gauge
 }
 
-func (s *Server) Flag(fs *flag.FlagSet) {
+func (s *Server) Flags(fs *flag.FlagSet) {
 	fs.StringVar(&s.dsn, "db", "", "connection string for pgx")
 	fs.StringVar(&s.initstate, "initstate", "/var/secret/iglog/iglog.json", "initial state file")
 	fs.DurationVar(&s.interval, "interval", 15*time.Minute, "update interval")
 }
 
-func (s *Server) Register(c *usvc.Components) error {
-	s.log = c.Log
-	s.tracer = c.Tracer
+func (s *Server) Setup(ctx context.Context, c *usvc.USVC) error {
+	s.log = c.Logger
+	s.tracer = global.Tracer(name)
 
-	sname := path.Base(name) + "."
-
-	var (
-		err       error
-		followers metric.Int64ValueObserver
-		following metric.Int64ValueObserver
-	)
-
-	bo := c.Meter.NewBatchObserver(func(ctx context.Context, bor metric.BatchObserverResult) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		bor.Observe(
-			nil,
-			followers.Observation(s.followers),
-			following.Observation(s.following),
-		)
+	s.followers = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "iglog_followers",
 	})
-	followers, err = bo.NewInt64ValueObserver(
-		sname+"followers",
-		metric.WithDescription("number of instagram followers"),
-	)
-	if err != nil {
-		return fmt.Errorf("create followers metric: %w", err)
-	}
-	following, err = bo.NewInt64ValueObserver(
-		sname+"following",
-		metric.WithDescription("number of instagram following"),
-	)
-	if err != nil {
-		return fmt.Errorf("create following metric: %w", err)
-	}
+	s.following = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "iglog_following",
+	})
 
-	err = s.dbSetup(context.Background())
+	err := s.dbSetup(ctx)
 	if err != nil {
 		return fmt.Errorf("setup db: %w", err)
 	}
 
-	go s.updater(context.Background())
-	return nil
-}
-
-func (s *Server) Shutdown(ctx context.Context) error {
-	s.pool.Close()
+	go s.updater(ctx)
+	go func() {
+		<-ctx.Done()
+		s.pool.Close()
+	}()
 	return nil
 }
 
@@ -110,23 +86,30 @@ func (s *Server) updater(ctx context.Context) {
 }
 
 func (s *Server) update(ctx context.Context) error {
+	ctx, span := s.tracer.Start(ctx, "update all")
+	defer span.End()
+
 	s.log.Info().Str("account", s.IG.Account.Username).Msg("starting update")
 	// get users
+	ctx, span = s.tracer.Start(ctx, "update followers")
 	newFollowers, err := getUsersPage(s.IG.Account.Followers())
+	span.End()
 	if err != nil {
 		return fmt.Errorf("update get followers: %w", err)
 	}
+	ctx, span = s.tracer.Start(ctx, "update following")
 	newFollowing, err := getUsersPage(s.IG.Account.Following())
 	if err != nil {
 		return fmt.Errorf("update get following: %w", err)
 	}
+	span.End()
 	s.log.Info().Int("followers", len(newFollowers)).Int("following", len(newFollowing)).Msg("update got from ig")
 
-	s.mu.Lock()
-	s.followers = int64(len(newFollowers))
-	s.following = int64(len(newFollowing))
-	s.mu.Unlock()
+	s.followers.Set(float64(len(newFollowers)))
+	s.following.Set(float64(len(newFollowing)))
 
+	ctx, span = s.tracer.Start(ctx, "update tx")
+	defer span.End()
 	err = ExecuteTx(ctx, s.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
 		// save state
 		_, err := tx.Exec(ctx, `UPDATE goinsta SET state = $1, timestamp = $2 WHERE id = 1;`, s.IG, time.Now())
@@ -134,16 +117,20 @@ func (s *Server) update(ctx context.Context) error {
 			return fmt.Errorf("update state: %w", err)
 		}
 
+		ctx, span = s.tracer.Start(ctx, "tx get old users")
 		// get old users
 		oldFollowers, err := getUsersDB(ctx, tx, true, false)
 		if err != nil {
+			span.End()
 			return fmt.Errorf("get old followers: %w", err)
 		}
 
 		oldFollowing, err := getUsersDB(ctx, tx, false, true)
 		if err != nil {
+			span.End()
 			return fmt.Errorf("get old following: %w", err)
 		}
+		span.End()
 
 		// diff users
 		lostFollowers, _, gainedFollowers := intersect(oldFollowers, newFollowers)
@@ -152,17 +139,23 @@ func (s *Server) update(ctx context.Context) error {
 			Strs("following-", usernames(lostFollowing)).Strs("following+", usernames(gainedFollowing)).Msg("diff")
 
 		// save users
+		ctx, span = s.tracer.Start(ctx, "tx save users")
 		err = upsertUsersDB(ctx, tx, newFollowers, true, false)
 		if err != nil {
+			span.End()
 			return fmt.Errorf("update followers: %w", err)
 		}
 		err = upsertUsersDB(ctx, tx, newFollowing, false, true)
 		if err != nil {
+			span.End()
 			return fmt.Errorf("update following: %w", err)
 		}
+		span.End()
 
 		// save events
+		ctx, span = s.tracer.Start(ctx, "tx save events")
 		err = insertEvents(ctx, tx, []map[int64]goinsta.User{lostFollowers, gainedFollowers, lostFollowing, gainedFollowing})
+		span.End()
 		if err != nil {
 			return fmt.Errorf("update events: %w", err)
 		}
