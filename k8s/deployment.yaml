@@ -37,6 +37,9 @@ spec:
               containerPort: 8080
             - name: metrics
               containerPort: 8000
+          env:
+            - name: JAEGER_SERVICE_NAME
+              value: iglog
           livenessProbe:
             httpGet:
               path: /liveness
