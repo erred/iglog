@@ -312,6 +312,8 @@ go.seankhliao.com/apis v0.0.0-20200925201609-7c5465abda54 h1:n4yW+JCLdLKPDZLc6KU
 go.seankhliao.com/apis v0.0.0-20200925201609-7c5465abda54/go.mod h1:qFACqbCaFLY/Wng7UsjWe3JaeHixJfducJljCsKSpDg=
 go.seankhliao.com/usvc v0.8.3 h1:uGB9zBDXMopyxXxNJeqbjvaFikJVba9T4wKonz/I9WM=
 go.seankhliao.com/usvc v0.8.3/go.mod h1:ES6/s1yWOIfuVdAeqObikvKJvt4gCZNqX8a4k05KdeQ=
+go.seankhliao.com/usvc v0.8.4 h1:02kRsTXjmG5Sq6bSQTF2wwMWRsE9bzkq8hHrzu+8K+I=
+go.seankhliao.com/usvc v0.8.4/go.mod h1:ES6/s1yWOIfuVdAeqObikvKJvt4gCZNqX8a4k05KdeQ=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.6.0/go.mod h1:sABNBOSYdrvTF6hTgEIbc7YasKWGhgEQZyfxyTvoXHQ=
