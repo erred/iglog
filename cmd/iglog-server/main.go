@@ -91,18 +91,14 @@ func (s *Server) update(ctx context.Context) error {
 
 	s.log.Info().Str("account", s.IG.Account.Username).Msg("starting update")
 	// get users
-	ctx, span = s.tracer.Start(ctx, "update followers")
-	newFollowers, err := getUsersPage(s.IG.Account.Followers())
-	span.End()
+	newFollowers, err := getUsersPage(ctx, s.IG.Account.Followers())
 	if err != nil {
 		return fmt.Errorf("update get followers: %w", err)
 	}
-	ctx, span = s.tracer.Start(ctx, "update following")
-	newFollowing, err := getUsersPage(s.IG.Account.Following())
+	newFollowing, err := getUsersPage(ctx, s.IG.Account.Following())
 	if err != nil {
 		return fmt.Errorf("update get following: %w", err)
 	}
-	span.End()
 	s.log.Info().Int("followers", len(newFollowers)).Int("following", len(newFollowing)).Msg("update got from ig")
 
 	s.followers.Set(float64(len(newFollowers)))
@@ -117,20 +113,16 @@ func (s *Server) update(ctx context.Context) error {
 			return fmt.Errorf("update state: %w", err)
 		}
 
-		ctx, span = s.tracer.Start(ctx, "tx get old users")
 		// get old users
 		oldFollowers, err := getUsersDB(ctx, tx, true, false)
 		if err != nil {
-			span.End()
 			return fmt.Errorf("get old followers: %w", err)
 		}
 
 		oldFollowing, err := getUsersDB(ctx, tx, false, true)
 		if err != nil {
-			span.End()
 			return fmt.Errorf("get old following: %w", err)
 		}
-		span.End()
 
 		// diff users
 		lostFollowers, _, gainedFollowers := intersect(oldFollowers, newFollowers)
@@ -139,23 +131,17 @@ func (s *Server) update(ctx context.Context) error {
 			Strs("following-", usernames(lostFollowing)).Strs("following+", usernames(gainedFollowing)).Msg("diff")
 
 		// save users
-		ctx, span = s.tracer.Start(ctx, "tx save users")
 		err = upsertUsersDB(ctx, tx, newFollowers, true, false)
 		if err != nil {
-			span.End()
 			return fmt.Errorf("update followers: %w", err)
 		}
 		err = upsertUsersDB(ctx, tx, newFollowing, false, true)
 		if err != nil {
-			span.End()
 			return fmt.Errorf("update following: %w", err)
 		}
-		span.End()
 
 		// save events
-		ctx, span = s.tracer.Start(ctx, "tx save events")
 		err = insertEvents(ctx, tx, []map[int64]goinsta.User{lostFollowers, gainedFollowers, lostFollowing, gainedFollowing})
-		span.End()
 		if err != nil {
 			return fmt.Errorf("update events: %w", err)
 		}
@@ -191,7 +177,10 @@ func (i *IG) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func getUsersPage(u *goinsta.Users) (map[int64]goinsta.User, error) {
+func getUsersPage(ctx context.Context, u *goinsta.Users) (map[int64]goinsta.User, error) {
+	ctx, span := global.Tracer(name).Start(ctx, "getUsersPage")
+	defer span.End()
+
 	users := make(map[int64]goinsta.User)
 	for u.Next() {
 		for _, uu := range u.Users {
@@ -206,6 +195,9 @@ func getUsersPage(u *goinsta.Users) (map[int64]goinsta.User, error) {
 }
 
 func getUsersDB(ctx context.Context, tx pgx.Tx, followers, following bool) (map[int64]goinsta.User, error) {
+	ctx, span := global.Tracer(name).Start(ctx, "getUsersDB")
+	defer span.End()
+
 	sqlstr := `SELECT uid, data FROM users WHERE %s = true`
 	if followers {
 		sqlstr = fmt.Sprintf(sqlstr, "follower")
@@ -237,6 +229,9 @@ func getUsersDB(ctx context.Context, tx pgx.Tx, followers, following bool) (map[
 }
 
 func upsertUsersDB(ctx context.Context, tx pgx.Tx, users map[int64]goinsta.User, followers, following bool) error {
+	ctx, span := global.Tracer(name).Start(ctx, "upsertUsersDB")
+	defer span.End()
+
 	sqlstr := `UPSERT INTO users (uid, %s, username, data) VALUES ($1, $2, $3, $4)`
 	if followers {
 		sqlstr = fmt.Sprintf(sqlstr, "follower")
@@ -255,6 +250,9 @@ func upsertUsersDB(ctx context.Context, tx pgx.Tx, users map[int64]goinsta.User,
 }
 
 func insertEvents(ctx context.Context, tx pgx.Tx, events []map[int64]goinsta.User) error {
+	ctx, span := global.Tracer(name).Start(ctx, "insertEvents")
+	defer span.End()
+
 	sqlstr := `INSERT INTO events (timestamp, event, uid) VALUES ($1, $2, $3)`
 	order := []string{"- follower", "+ follower", "- following", "+ following"}
 	for i, event := range events {
