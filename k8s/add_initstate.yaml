@@ -1,0 +1,28 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: iglog
+spec:
+  template:
+    spec:
+      containers:
+        - name: iglog
+          volumeMounts:
+            - name: certs
+              mountPath: /var/secret/tls
+            - name: client
+              mountPath: /var/secret/cockroachdb
+            # manual / initial deployment only
+            - name: initstate
+              mountPath: /var/secret/iglog
+      volumes:
+        - name: certs
+          secret:
+            secretName: iglog-cert
+        - name: client
+          secret:
+            secretName: cockroachdb-client-iglog
+        # manual / initial deployment only
+        - name: initstate
+          secret:
+            secretName: iglog-initstate
