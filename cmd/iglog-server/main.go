@@ -178,7 +178,7 @@ func (i *IG) UnmarshalJSON(b []byte) error {
 }
 
 func getUsersPage(ctx context.Context, u *goinsta.Users) (map[int64]goinsta.User, error) {
-	ctx, span := global.Tracer(name).Start(ctx, "getUsersPage")
+	_, span := global.Tracer(name).Start(ctx, "getUsersPage")
 	defer span.End()
 
 	users := make(map[int64]goinsta.User)
